@@ -24,6 +24,24 @@ export default function LobbiesIndex({ auth, lobbies }) {
     const [password, setPassword] = useState('');
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordError, setPasswordError] = useState('');
+    const [searchTerm, setSearchTerm] = useState(''); // Search term state
+    const filteredLobbies = lobbiesData.filter((lobby) =>
+        lobby.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+        const handleSearchChange = (e) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+
+        if (value.trim() === '') {
+            // If the search term is empty, show all lobbies
+            setFilteredLobbies(lobbiesData);
+        } else {
+            // Filter lobbies by code
+            setFilteredLobbies(
+                lobbiesData.filter(lobby => lobby.code.includes(value.trim()))
+            );
+        }
+    };
 
     useEffect(() => {
         setLobbiesData(lobbies.data || []); 
@@ -136,26 +154,6 @@ export default function LobbiesIndex({ auth, lobbies }) {
         )
     );
 
-
-    const joinLobby = async (lobbyId, password = null) => {
-        try {
-            const response = await axios.post(`/api/lobbies/${lobbyId}/join`, {
-                password: password
-            });
-            
-            if (response.status === 200) {
-                window.location.href = `/lobbies/${lobbyId}`;
-            }
-        } catch (error) {
-            if (error.response?.status === 403) {
-                // Handle incorrect password
-                setError('Incorrect password');
-            } else {
-                setError(error.response?.data?.message || 'Failed to join lobby');
-            }
-        }
-    };
-
     const handleJoinBack = async (e, lobbyId) => {
     try {
         // Redirect directly to the lobby page if already a member
@@ -209,7 +207,21 @@ export default function LobbiesIndex({ auth, lobbies }) {
         >
             <div className="container mx-auto px-4 max-w-7xl space-y-8">
                 <Head title="Game Lobbies" />
-
+                {/* Search Bar */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 100 }}
+                    className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-lg"
+                >
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        placeholder="Search by lobby code..."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </motion.div>
                 <motion.div 
                     initial={{ y: -50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -284,105 +296,110 @@ export default function LobbiesIndex({ auth, lobbies }) {
                     }}
                     className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
                 >
-                    {Array.isArray(lobbiesData) && lobbiesData.map((lobby) => (
-                        <motion.div 
-                            key={lobby.id} 
-                            variants={{
-                                hidden: { opacity: 0, y: 20 },
-                                visible: { 
-                                    opacity: 1, 
-                                    y: 0,
-                                    transition: { duration: 0.5 }
-                                }
-                            }}
-                            className="bg-white border border-slate-100 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-2 overflow-hidden"
-                        >
-                            <div className="p-6 relative">
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold border ${getLobbyStatusColor(lobby.status)}`}
+                    {Array.isArray(filteredLobbies) && filteredLobbies.length > 0 ? (
+    filteredLobbies.map((lobby) => (
+        <motion.div 
+            key={lobby.id} 
+            variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { 
+                    opacity: 1, 
+                    y: 0,
+                    transition: { duration: 0.5 }
+                }
+            }}
+            className="bg-white border border-slate-100 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-2 overflow-hidden"
+        >
+            <div className="p-6 relative">
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold border ${getLobbyStatusColor(lobby.status)}`}
+                >
+                    {lobby.status.charAt(0).toUpperCase() + lobby.status.slice(1)}
+                </motion.div>
+
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2 truncate max-w-[200px]">
+                            {lobby.name}
+                        </h2>
+                        <div className="flex space-x-2 items-center">
+                            <AnimatedPrivacyIcon isPrivate={lobby.is_private} />
+                            <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
+                                #{lobby.code}
+                            </span>
+                            {lobby.is_private && (
+                                <div className="flex items-center space-x-1 bg-yellow-50 text-yellow-600 px-2 py-1 rounded-full">
+                                    <Key className="w-3 h-3" />
+                                </div>
+                            )}
+                            {lobby.game_ranking === 'ranked' && (
+                                <motion.div
+                                    whileHover={{ rotate: 360, transition: { duration: 0.5 } }}
                                 >
-                                    {lobby.status.charAt(0).toUpperCase() + lobby.status.slice(1)}
+                                    <Trophy className="w-4 h-4 text-yellow-500" />
                                 </motion.div>
+                            )}
+                            {lobby.game_ranking === 'unranked' && (
+                                <motion.div
+                                    whileHover={{ rotate: 360, transition: { duration: 0.5 } }}
+                                >
+                                    <Shield className="w-4 h-4 text-blue-900" />
+                                </motion.div>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-slate-800 mb-2 truncate max-w-[200px]">
-                                            {lobby.name}
-                                        </h2>
-                                        <div className="flex space-x-2 items-center">
-                                            <AnimatedPrivacyIcon isPrivate={lobby.is_private} />
-                                            <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
-                                                #{lobby.code}
-                                            </span>
-                                            {lobby.is_private && (
-                                            <div className="flex items-center space-x-1 bg-yellow-50 text-yellow-600 px-2 py-1 rounded-full">
-                                                <Key className="w-3 h-3" />
-                                            </div>
-                                        )}
-                                            {lobby.game_ranking === 'ranked' && (
-                                                <motion.div
-                                                    whileHover={{ rotate: 360, transition: { duration: 0.5 } }}
-                                                >
-                                                    <Trophy className="w-4 h-4 text-yellow-500" />
-                                                </motion.div>
-                                            )}
-                                            {lobby.game_ranking === 'unranked' && (
-                                                <motion.div
-                                                    whileHover={{ rotate: 360, transition: { duration: 0.5 } }}
-                                                >
-                                                    <Shield className="w-4 h-4 text-blue-900" />
-                                                </motion.div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <Users className="w-5 h-5 text-slate-500" />
+                            <p className="text-sm text-slate-600">
+                                {lobby.current_players}/{lobby.max_players} Players
+                            </p>
+                        </div>
+                        <p className="text-sm text-slate-500">
+                            Created by: {lobby.creator?.name || 'Anonymous'}
+                        </p>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-4">
+                        <motion.button
+                            onClick={(e) => 
+                                lobby.is_current_user_in_lobby 
+                                    ? handleJoinBack(e, lobby.id) 
+                                    : handleJoinLobby(e, lobby.id, lobby.is_private)
+                            }
+                            disabled={!lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players}  
+                            className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all ${
+                                !lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players
+                                    ? 'bg-red-500 text-white cursor-not-allowed opacity-70'  
+                                    : lobby.is_current_user_in_lobby
+                                        ? 'bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700'
+                                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'  
+                            }`}
+                        >
+                            {!lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players 
+                                ? 'Lobby Full' 
+                                : lobby.is_current_user_in_lobby 
+                                    ? 'Join Back' 
+                                    : 'Join Lobby'}  
+                        </motion.button>
+                        <PasswordModal />
+                        <span className="text-xs text-slate-400">
+                            {new Date(lobby.created_at).toLocaleString()}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    ))
+) : (
+    <p className="col-span-full text-center text-lg text-gray-600">No lobbies found</p>
+)}
 
-                                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                            <Users className="w-5 h-5 text-slate-500" />
-                                            <p className="text-sm text-slate-600">
-                                                {lobby.current_players}/{lobby.max_players} Players
-                                            </p>
-                                        </div>
-                                        <p className="text-sm text-slate-500">
-                                            Created by: {lobby.creator?.name || 'Anonymous'}
-                                        </p>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center mt-4">
-                                        <motion.button
-                                            onClick={(e) => 
-                                                lobby.is_current_user_in_lobby 
-                                                    ? handleJoinBack(e, lobby.id) 
-                                                    : handleJoinLobby(e, lobby.id, lobby.is_private)
-                                            }
-                                        disabled={!lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players}  
-                                        className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all ${
-                                            !lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players
-                                                ? 'bg-red-500 text-white cursor-not-allowed opacity-70'  
-                                                : lobby.is_current_user_in_lobby
-                                                    ? 'bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700'
-                                                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'  
-                                        }`}
-                                    >
-                                        {!lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players 
-                                            ? 'Lobby Full' 
-                                            : lobby.is_current_user_in_lobby 
-                                                ? 'Join Back' 
-                                                : 'Join Lobby'}  
-                                    </motion.button>
-                                    <PasswordModal />
-                                        <span className="text-xs text-slate-400">
-                                            {new Date(lobby.created_at).toLocaleString()}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
                 </motion.div>
 
                 {/* Pagination remains the same */}

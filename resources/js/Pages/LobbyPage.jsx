@@ -14,6 +14,7 @@ export default function LobbyPage({ lobby, auth }) {
     const [userReadyStatus, setUserReadyStatus] = useState(false);
     const [allPlayersReady, setAllPlayersReady] = useState(false);
     const [settingsModalOpen, setSettingsModalOpen] = useState(false); // Track modal visibility
+    
     const [updatedSettings, setUpdatedSettings] = useState({
         max_players: 4, // Default to 4 players
         spectate_allowed: lobby.spectate_allowed,
@@ -101,11 +102,34 @@ const handleRefresh = async () => {
         console.error('Error refreshing this lobby:', error);
     }
 };
-    const copyLobbyCode = () => {
-        navigator.clipboard.writeText(lobby.code);
+const copyLobbyCode = () => {
+    if (navigator.clipboard) {
+        // Use Clipboard API if available
+        navigator.clipboard.writeText(lobby.code).then(() => {
+            setCopied(true);
+            console.log('Lobby code copied to clipboard');
+
+            setTimeout(() => setCopied(false), 2000);
+        }).catch((error) => {
+            console.error('Failed to copy: ', error);
+        });
+    } else {
+        // Fallback method for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = lobby.code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
         setCopied(true);
+        console.log('Lobby code copied to clipboard (fallback)');
+
         setTimeout(() => setCopied(false), 2000);
-    };
+    }
+};
+
+
 
     const handleInvitePlayer = async (e) => {
         e.preventDefault();
@@ -213,34 +237,34 @@ const toggleReadyStatus = async () => {
                                 )}
                             </motion.h1>
                             <motion.div 
-                                variants={textVariants}
-                                initial="hidden"
-                                animate="visible"
-                                className="mt-2 flex items-center space-x-2"
+                            variants={textVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="mt-2 flex items-center space-x-2"
+                        >
+                            <motion.span 
+                                variants={symbolVariants}
+                                initial="initial"
+                                animate="animate"
+                                className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-sm font-medium"
                             >
-                                <motion.span 
-                                    variants={symbolVariants}
-                                    initial="initial"
-                                    animate="animate"
-                                    className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-sm font-medium"
-                                >
-                                    Lobby Code: {lobby.code}
-                                </motion.span>
-                                <motion.button 
-                                    variants={symbolVariants}
-                                    initial="initial"
-                                    animate="animate"
-                                    whileHover="hover"
-                                    onClick={copyLobbyCode}
-                                    className="text-gray-500 hover:text-blue-600"
-                                >
-                                    {copied ? (
-                                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                                    ) : (
-                                        <Copy className="w-5 h-5" />
-                                    )}
-                                </motion.button>
-                            </motion.div>
+                                Lobby Code: {lobby.code || 'N/A'}
+                            </motion.span>
+                            <motion.button 
+                                variants={symbolVariants}
+                                initial="initial"
+                                animate="animate"
+                                whileHover="hover"
+                                onClick={copyLobbyCode}
+                                className="text-gray-500 hover:text-blue-600"
+                            >
+                                {copied ? (
+                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <Copy className="w-5 h-5" />
+                                )}
+                            </motion.button>
+                        </motion.div>
                         </div>
                         <motion.button 
                             initial="initial"
