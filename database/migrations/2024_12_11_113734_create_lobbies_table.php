@@ -22,6 +22,7 @@ return new class extends Migration
             
             // Additional game configuration
             $table->boolean('is_private')->default(false); // Private vs public lobby
+            $table->string('password', 255)->nullable();
             $table->integer('round_number')->default(0); // Track game rounds
             $table->enum('game_ranking', ['ranked', 'unranked'])->default('unranked');            
 

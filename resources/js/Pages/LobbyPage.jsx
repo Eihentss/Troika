@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Head, Link } from '@inertiajs/react';
-import { Users, LogOut, UserPlus, Copy, Trophy, Settings, CheckCircle2, XCircle, UserCheck } from 'lucide-react';
+import { Users, LogOut, UserPlus, Copy, Trophy,Eye,Unlock,EyeOff,Shield, Settings,Key, CheckCircle2,Lock, XCircle, UserCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { router } from '@inertiajs/react';
 import ChatComponent from './ChatComponent';
@@ -25,19 +25,19 @@ export default function LobbyPage({ lobby, auth }) {
         setSettingsModalOpen(!settingsModalOpen);
     };
 
-    const handleSettingsChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        
+    const handleSettingsChange = (name, value) => {
         // If the field is max_players and the value is greater than 4, limit it to 4
         if (name === 'max_players' && value > 4) {
             return; // Prevent updating the value if it's greater than 4
         }
     
+        // Update the state based on the selected value
         setUpdatedSettings({
             ...updatedSettings,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: value
         });
     };
+    
 
     const saveSettings = async () => {
         try {
@@ -268,78 +268,147 @@ const toggleReadyStatus = async () => {
                                 <Users className="mr-2 text-gray-500" />
                                 Players ({lobby.current_players}/{lobby.max_players})
                             </h2>
+                            
                             <motion.button 
                                 whileHover={{ scale: 1.1 }}
                                 className="text-blue-600 hover:bg-blue-50 p-2 rounded-full"
                             >
-                       <motion.button onClick={toggleSettingsModal} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
-                            <Settings className="w-5 h-5" />
-                        </motion.button>    
+                              {lobby.creator_id === auth.user.id && (
+                                    <motion.button onClick={toggleSettingsModal} className="text-blue-600 hover:bg-blue-50 p-2 rounded-full">
+                                        <Settings className="w-5 h-5" />
+                                    </motion.button>   
+                                )}
+ 
                             </motion.button>
                         </div>
-                                {settingsModalOpen && (
-                            <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex justify-center items-center">
-                                <div className="bg-white p-6 rounded-xl shadow-lg w-1/3">
-                                    <h2 className="text-xl font-semibold mb-4">Lobby Settings</h2>
-                                    <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Max Players</label>
-                                        <input
-                                            type="number"
-                                            name="max_players"
-                                            value={updatedSettings.max_players}
-                                            onChange={handleSettingsChange}
-                                            min="2" // Assuming minimum players is 2
-                                            max="4" // Limit max players to 4
-                                            className="w-full p-2 border border-gray-300 rounded-md"
-                                        />
-                                    </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Allow Spectators</label>
-                                            <input
-                                                type="checkbox"
-                                                name="spectate_allowed"
-                                                checked={updatedSettings.spectate_allowed}
-                                                onChange={handleSettingsChange}
-                                                className="mr-2"
-                                            />
-                                            <span>Allow Spectators</span>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Private Lobby</label>
-                                            <input
-                                                type="checkbox"
-                                                name="is_private"
-                                                checked={updatedSettings.is_private}
-                                                onChange={handleSettingsChange}
-                                                className="mr-2"
-                                            />
-                                            <span>Private Lobby</span>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Game Ranking</label>
-                                            <select
-                                                name="game_ranking"
-                                                value={updatedSettings.game_ranking}
-                                                onChange={handleSettingsChange}
-                                                className="w-full p-2 border border-gray-300 rounded-md"
-                                            >
-                                                <option value="ranked">Ranked</option>
-                                                <option value="unranked">Unranked</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="mt-6 flex justify-end space-x-4">
-                                        <button onClick={() => setSettingsModalOpen(false)} className="bg-gray-500 text-white px-4 py-2 rounded-md">
-                                            Cancel
-                                        </button>
-                                        <button onClick={saveSettings} className="bg-blue-600 text-white px-4 py-2 rounded-md">
-                                            Save
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                        {settingsModalOpen && (
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex justify-center items-center">
+        <div className="bg-white p-6 rounded-xl shadow-lg w-1/3">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold flex items-center text-gray-800">
+                    <Settings className="mr-2 text-blue-500" /> Lobby Settings
+                </h2>
+                <button
+                    onClick={() => setSettingsModalOpen(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                    ×
+                </button>
+            </div>
+            <div className="space-y-4">
+                {/* Max Players */}
+                <div className="flex space-x-2">
+                    {[2, 3, 4].map((players) => (
+                        <button
+                            key={players}
+                            type="button"
+                            onClick={() => handleSettingsChange('max_players', players)}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                updatedSettings.max_players === players
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            {players} Players
+                        </button>
+                    ))}
+                </div>
+
+                {/* Allow Spectators */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        {updatedSettings.spectate_allowed ? (
+                            <Eye className="mr-2 text-green-500" />
+                        ) : (
+                            <EyeOff className="mr-2 text-red-500" />
                         )}
+                        Allow Spectators
+                    </label>
+                    <div className="flex space-x-2">
+                        <button
+                            type="button"
+                            onClick={() => handleSettingsChange('spectate_allowed', true)}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                updatedSettings.spectate_allowed
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            Allow
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSettingsChange('spectate_allowed', false)}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                !updatedSettings.spectate_allowed
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            Disallow
+                        </button>
+                    </div>
+                </div>
+
+                {/* Private Lobby */}
+                
+                
+                {/* Game Ranking */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        {updatedSettings.game_ranking === 'ranked' ? (
+                            <Trophy className="mr-2 text-yellow-500" />
+                        ) : (
+                            <Shield className="mr-2 text-gray-500" />
+                        )}
+                        Game Ranking
+                    </label>
+                    <div className="flex space-x-2">
+                        <button
+                            type="button"
+                            onClick={() => handleSettingsChange('game_ranking', 'unranked')}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                updatedSettings.game_ranking === 'unranked'
+                                    ? 'bg-gray-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            Unranked
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSettingsChange('game_ranking', 'ranked')}
+                            className={`px-4 py-2 rounded-lg transition-all ${
+                                updatedSettings.game_ranking === 'ranked'
+                                    ? 'bg-yellow-500 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            Ranked
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex justify-end space-x-4">
+                <button
+                    onClick={() => setSettingsModalOpen(false)}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={saveSettings}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+)}
+
                              
                                     
                         <div className="space-y-4">

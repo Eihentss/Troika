@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use App\Models\ChatMessage; // Correct namespace
 use App\Events\ChatMessageSent; // Add this import
+use Illuminate\Support\Facades\Hash;
 
 class LobbyController extends Controller
 {
@@ -26,9 +27,10 @@ class LobbyController extends Controller
             'max_players' => 'integer|min:2|max:4|nullable',
             'spectate_allowed' => 'boolean|nullable',
             'is_private' => 'boolean|nullable',
+            'password' => 'required_if:is_private,true|string|nullable|min:4', // Paroles validācija
             'game_ranking' => 'in:ranked,unranked|nullable'
         ]);
-    
+        
         // Generate a unique 6-digit code
         $validated['code'] = Lobby::generateUniqueCode();
         
@@ -40,6 +42,7 @@ class LobbyController extends Controller
         $validated['is_private'] = $validated['is_private'] ?? false;
         $validated['game_ranking'] = $validated['game_ranking'] ?? 'unranked';
         $validated['round_number'] = 0;
+        $validated['password'] = $validated['is_private'] ? Hash::make($validated['password']) : null; // Hashojam paroli
         $validated['creator_id'] = $user->id;
     
         // Create new lobby
@@ -127,13 +130,24 @@ public function show($id)
     }
 
 
-public function joinLobby($lobbyId)
+public function joinLobby(Request $request,$lobbyId)
 {
     // Get the current user
     $user = auth()->user();
     
     // Find the lobby
     $lobby = Lobby::findOrFail($lobbyId);
+
+    // Check if lobby is private and verify password
+    if ($lobby->is_private) {
+        $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        if (!Hash::check($request->password, $lobby->password)) {
+            return response()->json(['message' => 'Incorrect password'], 403);
+        }
+    }
 
     // Check if the user is already in the lobby
     $userAlreadyInLobby = \DB::table('lobby_user')
@@ -327,7 +341,6 @@ public function startGame($lobbyId)
         'status' => 'playing'
     ]);
 
-    // Redirect to the game route
     return redirect()->route('game.show', ['lobbyId' => $lobbyId]);
 }
 

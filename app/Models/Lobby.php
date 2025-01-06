@@ -19,6 +19,7 @@ class Lobby extends Model
         'status', 
         'spectate_allowed', 
         'is_private', 
+        'password',
         'round_number', 
         'game_ranking',
         'game_started_at', 

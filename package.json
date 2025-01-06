@@ -27,10 +27,11 @@
         "framer-motion": "^11.14.4",
         "laravel-echo": "^1.17.1",
         "lucide-react": "^0.468.0",
+        "motion": "^11.15.0",
         "pusher-js": "^8.4.0-rc2",
         "react-router-dom": "^5.3.4",
         "socket.io": "^4.8.1",
         "socket.io-client": "^4.8.1"
     },
-    "proxy": "http://10.13.54.162:1211"
+    "proxy": "http://10.13.57.76:7771"
 }

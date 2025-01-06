@@ -11,7 +11,8 @@ import {
     Globe,
     Shield,
     Trophy,
-    RefreshCcw 
+    RefreshCcw,
+    Key
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -19,6 +20,10 @@ export default function LobbiesIndex({ auth, lobbies }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [lobbiesData, setLobbiesData] = useState([]); 
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedLobbyId, setSelectedLobbyId] = useState(null);
+    const [password, setPassword] = useState('');
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
 
     useEffect(() => {
         setLobbiesData(lobbies.data || []); 
@@ -47,14 +52,107 @@ export default function LobbiesIndex({ auth, lobbies }) {
     };
 
 
-        const handleJoinLobby = async (e, lobbyId) => {
+    const handleJoinLobby = async (e, lobbyId, isPrivate) => {
+        e.preventDefault();
+        if (isPrivate) {
+            setSelectedLobbyId(lobbyId);
+            setShowPasswordModal(true);
+            setPasswordError('');
+        } else {
+            try {
+                const response = await axios.post(`/lobbies/${lobbyId}/join`);
+                if (response.status === 200) {
+                    window.location.href = `/api/lobbies/${lobbyId}`;
+                }
+            } catch (error) {
+                console.error(error.response?.data?.message || 'Failed to join lobby');
+            }
+        }
+    };
+    const handlePasswordSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(`/lobbies/${lobbyId}/join`);
-            window.location.href = '/api/lobbies/' + lobbyId;
+            const response = await axios.post(`/lobbies/${selectedLobbyId}/join`, {
+                password: password
+            });
+            if (response.status === 200) {
+                setShowPasswordModal(false);
+                setPassword('');
+                window.location.href = `/api/lobbies/${selectedLobbyId}`;
+            }
         } catch (error) {
-            console.error('Error joining lobby:', error);
+            if (error.response?.status === 403) {
+                setPasswordError('Incorrect password');
+            } else {
+                setPasswordError(error.response?.data?.message || 'Failed to join lobby');
+            }
+        }
+    };
+    const PasswordModal = () => (
+        showPasswordModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
+                >
+                    <h3 className="text-xl font-bold text-slate-800 mb-4">Enter Lobby Password</h3>
+                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                        <div>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Enter password"
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                            />
+                            {passwordError && (
+                                <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                            )}
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowPasswordModal(false);
+                                    setPassword('');
+                                    setPasswordError('');
+                                }}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                            >
+                                Join Lobby
+                            </button>
+                        </div>
+                    </form>
+                </motion.div>
+            </div>
+        )
+    );
 
+
+    const joinLobby = async (lobbyId, password = null) => {
+        try {
+            const response = await axios.post(`/api/lobbies/${lobbyId}/join`, {
+                password: password
+            });
+            
+            if (response.status === 200) {
+                window.location.href = `/lobbies/${lobbyId}`;
+            }
+        } catch (error) {
+            if (error.response?.status === 403) {
+                // Handle incorrect password
+                setError('Incorrect password');
+            } else {
+                setError(error.response?.data?.message || 'Failed to join lobby');
+            }
         }
     };
 
@@ -218,6 +316,11 @@ export default function LobbiesIndex({ auth, lobbies }) {
                                             <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
                                                 #{lobby.code}
                                             </span>
+                                            {lobby.is_private && (
+                                            <div className="flex items-center space-x-1 bg-yellow-50 text-yellow-600 px-2 py-1 rounded-full">
+                                                <Key className="w-3 h-3" />
+                                            </div>
+                                        )}
                                             {lobby.game_ranking === 'ranked' && (
                                                 <motion.div
                                                     whileHover={{ rotate: 360, transition: { duration: 0.5 } }}
@@ -251,11 +354,11 @@ export default function LobbiesIndex({ auth, lobbies }) {
                                     
                                     <div className="flex justify-between items-center mt-4">
                                         <motion.button
-                                        onClick={(e) => 
-                                            lobby.is_current_user_in_lobby 
-                                                ? handleJoinBack(e, lobby.id) 
-                                                : handleJoinLobby(e, lobby.id)
-                                        }
+                                            onClick={(e) => 
+                                                lobby.is_current_user_in_lobby 
+                                                    ? handleJoinBack(e, lobby.id) 
+                                                    : handleJoinLobby(e, lobby.id, lobby.is_private)
+                                            }
                                         disabled={!lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players}  
                                         className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all ${
                                             !lobby.is_current_user_in_lobby && lobby.current_players >= lobby.max_players
@@ -271,6 +374,7 @@ export default function LobbiesIndex({ auth, lobbies }) {
                                                 ? 'Join Back' 
                                                 : 'Join Lobby'}  
                                     </motion.button>
+                                    <PasswordModal />
                                         <span className="text-xs text-slate-400">
                                             {new Date(lobby.created_at).toLocaleString()}
                                         </span>
