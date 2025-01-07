@@ -80,22 +80,13 @@ public function index()
 }
 
 public function show($id)
-{  
-     $user = auth()->user();
+{
     // Find the lobby with its players
     $lobby = Lobby::with('players')->find($id);
 
-    $lobbies = Lobby::with(['creator', 'players'])
-        ->orderBy('created_at', 'desc')
-        ->paginate(9)
-        ->through(function ($lobby) use ($user) {
-            $lobby->is_current_user_in_lobby = $lobby->players->contains('id', $user->id);
-            return $lobby;
-        });
-
     if (!$lobby) {
         return Inertia::render('LobbiesIndex', [
-            'lobbies' => $lobbies,
+        'lobbies' => $lobbies,
         ]);
     }
 
@@ -319,9 +310,8 @@ public function toggleReadyStatus($lobbyId)
 
 public function startGame($lobbyId)
 {
-    // Get the current user
     $currentUser = auth()->user();
-    
+
     // Fetch all lobbies for the redirect case
     $lobbies = Lobby::with(['creator', 'players'])
         ->orderBy('created_at', 'desc')
@@ -332,17 +322,16 @@ public function startGame($lobbyId)
         });
 
     try {
-        // Try to find the lobby
+        // Find the lobby and include players
         $lobby = Lobby::with('players')->find($lobbyId);
-        
-        // If lobby doesn't exist, redirect to lobby index
+
         if (!$lobby) {
             return Inertia::render('LobbiesIndex', [
                 'lobbies' => $lobbies,
             ]);
         }
 
-        // Check if the current user is already playing
+        // Check if the current user is part of the lobby
         $userInLobby = DB::table('lobby_user')
             ->where('lobby_id', $lobbyId)
             ->where('user_id', $currentUser->id)
@@ -363,27 +352,31 @@ public function startGame($lobbyId)
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Wrap database operations in a transaction
+        // Start the game: Update statuses and lobby details
         DB::transaction(function () use ($lobby, $lobbyId) {
-            // Update all players' status to playing
             DB::table('lobby_user')
                 ->where('lobby_id', $lobbyId)
                 ->update([
                     'status' => 'playing',
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ]);
 
-            // Update lobby game start time
             $lobby->update([
                 'game_started_at' => now(),
-                'status' => 'playing'
+                'status' => 'playing',
             ]);
+        });
+
+        // Send all players to the game page
+        $lobby->players->each(function ($player) use ($lobbyId) {
+            // You may use a reāllaika notifikācija vai citas metodes
+            event(new \App\Events\GameStarted($player->id, $lobbyId));
         });
 
         return redirect()->route('game.show', ['lobbyId' => $lobbyId]);
 
     } catch (\Exception $e) {
-        // If any error occurs, redirect to lobby index
+        // Handle errors gracefully
         return Inertia::render('LobbiesIndex', [
             'lobbies' => $lobbies,
         ]);

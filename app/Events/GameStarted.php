@@ -3,46 +3,25 @@
 namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Queue\SerializesModels;
-use App\Models\Lobby;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Broadcasting\InteractsWithSockets;
 
-class GameStarted implements ShouldBroadcast
+class GameStarted
 {
-    use InteractsWithSockets, SerializesModels;
+    use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $lobby;
+    public $userId;
+    public $lobbyId;
 
-    /**
-     * Izveido jaunu notikumu instance.
-     *
-     * @param \App\Models\Lobby $lobby
-     */
-    public function __construct(Lobby $lobby)
+    public function __construct($userId, $lobbyId)
     {
-        $this->lobby = $lobby->load('players'); // Iekļaujam spēlētājus datu kopā
+        $this->userId = $userId;
+        $this->lobbyId = $lobbyId;
     }
 
-    /**
-     * Kanāls, kurā tiek pārraidīts notikums.
-     *
-     * @return \Illuminate\Broadcasting\Channel
-     */
     public function broadcastOn()
     {
-        return new PrivateChannel('lobby-' . $this->lobby->id);
-    }
-
-    /**
-     * Notikuma nosaukums klientam.
-     *
-     * @return string
-     */
-    public function broadcastAs()
-    {
-        return 'GameStarted';
+        return new Channel('game-channel');
     }
 }

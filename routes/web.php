@@ -44,7 +44,7 @@ Route::middleware('auth')->group(function () {
 
 
 
-    Route::get('/api/lobbies/{lobby}/start-game', [LobbyController::class, 'startGame'])
+    Route::get('/api/lobbies/{lobbyId}/start-game', [LobbyController::class, 'startGame'])
     ->name('lobby.startGame')
     ->middleware(['auth', 'verified']);
 

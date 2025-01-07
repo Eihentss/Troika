@@ -176,16 +176,18 @@ const toggleReadyStatus = async () => {
         const intervalId = setInterval(checkLobbyStatus, 2000);
         return () => clearInterval(intervalId);
     }, [lobby.id]);
-    
+
 
     const startGame = async () => {
         try {
-            await axios.post(`/api/lobbies/${lobby.id}/start-game`);
+            await axios.get(`/api/lobbies/${lobby.id}/start-game`);
             // The redirect will be handled by the useEffect hook above
         } catch (error) {
             console.error('Error starting game:', error);
         }
     };
+
+    
     const textVariants = {
         hidden: { opacity: 0, x: -20 },
         visible: { 
@@ -527,7 +529,7 @@ const toggleReadyStatus = async () => {
                         {lobby.creator_id === auth.user.id && allPlayersReady && lobby.current_players === lobby.max_players && (
                             <motion.button 
                                 whileTap={{ scale: 0.95 }}
-                                onClick={startGame}
+                                onClick={() => startGame()}
                                 className="w-full bg-green-600 text-white p-4 rounded-xl hover:bg-green-700 transition-colors text-lg font-semibold"
                             >
                                 Start Game

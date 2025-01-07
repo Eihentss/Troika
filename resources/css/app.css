@@ -2,38 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
 .game-container {
-    text-align: center;
-    padding: 20px;
-}
-
-.hand-container {
-    margin-bottom: 20px;
-}
-
-.card-button {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-}
-
-.card-image {
-    width: 80px;
-    height: auto;
-    margin: 5px;
-}
-
-.played-cards-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     margin-top: 20px;
 }
 
-.played-card-image {
-    width: 50px;
-    height: auto;
-    margin: 5px;
+.player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px;
 }
 
-.game-info {
-    margin-top: 20px;
-    font-size: 1.2em;
+.player-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
 }
+
+.cards {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.face-down {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.face-up {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: -30px; /* Move face-up cards a little above */
+}
+
+.card {
+    width: 100px;
+    height: 150px;
+    margin: 20px;
+    transition: transform 0.3s ease;
+}
+
+.tilted-card {
+    transform: rotate(10deg); /* Tilt the card slightly to the right */
+}
+
+/* Optional: Style for the back of the cards */
+.card img {
+    width: 100%;
+    height: auto;
+}
+
+/* Pašreizējais lietotājs apakšā */
+.bottom-player {
+    position: absolute;
+    bottom: 10px;
+    left: 40%;
+
+}
+
+/* Pārējie spēlētāji */
+.other-player {
+    position: absolute;
+    top: 0%;
+    left: 40%;
+    /* Papildu stils dinamiskam izvietojumam var tikt pievienots */
+}   
