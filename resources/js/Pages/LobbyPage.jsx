@@ -160,10 +160,28 @@ const toggleReadyStatus = async () => {
             console.error('Error toggling ready status:', error);
         }
     };
+    useEffect(() => {
+        const checkLobbyStatus = async () => {
+            try {
+                const response = await axios.get(`/api/lobbies/${lobby.id}`);
+                if (response.data.status === 'playing') {
+                    // Redirect to game if lobby status is 'playing'
+                    window.location.href = `/game/${lobby.id}`;
+                }
+            } catch (error) {
+                console.error('Error checking lobby status:', error);
+            }
+        };
+    
+        const intervalId = setInterval(checkLobbyStatus, 2000);
+        return () => clearInterval(intervalId);
+    }, [lobby.id]);
+    
 
     const startGame = async () => {
         try {
-            await router.visit(`/api/lobbies/${lobby.id}/start-game`);
+            await axios.post(`/api/lobbies/${lobby.id}/start-game`);
+            // The redirect will be handled by the useEffect hook above
         } catch (error) {
             console.error('Error starting game:', error);
         }

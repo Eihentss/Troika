@@ -80,12 +80,23 @@ public function index()
 }
 
 public function show($id)
-{
+{  
+     $user = auth()->user();
     // Find the lobby with its players
     $lobby = Lobby::with('players')->find($id);
 
+    $lobbies = Lobby::with(['creator', 'players'])
+        ->orderBy('created_at', 'desc')
+        ->paginate(9)
+        ->through(function ($lobby) use ($user) {
+            $lobby->is_current_user_in_lobby = $lobby->players->contains('id', $user->id);
+            return $lobby;
+        });
+
     if (!$lobby) {
-        return response()->json(['message' => 'Lobby not found'], 404);
+        return Inertia::render('LobbiesIndex', [
+            'lobbies' => $lobbies,
+        ]);
     }
 
     $lobby = Lobby::with(['players' => function ($query) {
@@ -308,40 +319,75 @@ public function toggleReadyStatus($lobbyId)
 
 public function startGame($lobbyId)
 {
-    $lobby = Lobby::with('players')->findOrFail($lobbyId);
-
-    // Check if the current user is already playing
+    // Get the current user
     $currentUser = auth()->user();
-    $userInLobby = DB::table('lobby_user')
-        ->where('lobby_id', $lobbyId)
-        ->where('user_id', $currentUser->id)
-        ->first();
+    
+    // Fetch all lobbies for the redirect case
+    $lobbies = Lobby::with(['creator', 'players'])
+        ->orderBy('created_at', 'desc')
+        ->paginate(9)
+        ->through(function ($lobby) use ($currentUser) {
+            $lobby->is_current_user_in_lobby = $lobby->players->contains('id', $currentUser->id);
+            return $lobby;
+        });
 
-    if ($userInLobby && $userInLobby->status === 'playing') {
-        // Redirect to the game route for players with 'playing' status
+    try {
+        // Try to find the lobby
+        $lobby = Lobby::with('players')->find($lobbyId);
+        
+        // If lobby doesn't exist, redirect to lobby index
+        if (!$lobby) {
+            return Inertia::render('LobbiesIndex', [
+                'lobbies' => $lobbies,
+            ]);
+        }
+
+        // Check if the current user is already playing
+        $userInLobby = DB::table('lobby_user')
+            ->where('lobby_id', $lobbyId)
+            ->where('user_id', $currentUser->id)
+            ->first();
+
+        if (!$userInLobby) {
+            return Inertia::render('LobbiesIndex', [
+                'lobbies' => $lobbies,
+            ]);
+        }
+
+        if ($userInLobby->status === 'playing') {
+            return redirect()->route('game.show', ['lobbyId' => $lobbyId]);
+        }
+
+        // Ensure only the creator can start the game
+        if ($currentUser->id !== $lobby->creator_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Wrap database operations in a transaction
+        DB::transaction(function () use ($lobby, $lobbyId) {
+            // Update all players' status to playing
+            DB::table('lobby_user')
+                ->where('lobby_id', $lobbyId)
+                ->update([
+                    'status' => 'playing',
+                    'updated_at' => now()
+                ]);
+
+            // Update lobby game start time
+            $lobby->update([
+                'game_started_at' => now(),
+                'status' => 'playing'
+            ]);
+        });
+
         return redirect()->route('game.show', ['lobbyId' => $lobbyId]);
-    }
 
-    // Ensure only the creator can start the game
-    if (auth()->id() !== $lobby->creator_id) {
-        return response()->json(['message' => 'Unauthorized'], 403);
-    }
-
-    // Update all players' status to playing
-    DB::table('lobby_user')
-        ->where('lobby_id', $lobbyId)
-        ->update([
-            'status' => 'playing',
-            'updated_at' => now()
+    } catch (\Exception $e) {
+        // If any error occurs, redirect to lobby index
+        return Inertia::render('LobbiesIndex', [
+            'lobbies' => $lobbies,
         ]);
-
-    // Update lobby game start time
-    $lobby->update([
-        'game_started_at' => now(),
-        'status' => 'playing'
-    ]);
-
-    return redirect()->route('game.show', ['lobbyId' => $lobbyId]);
+    }
 }
 
 
