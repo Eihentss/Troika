@@ -25,20 +25,23 @@ export default function LobbiesIndex({ auth, lobbies }) {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordError, setPasswordError] = useState('');
     const [searchTerm, setSearchTerm] = useState(''); // Search term state
-    const filteredLobbies = lobbiesData.filter((lobby) =>
-        lobby.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-        const handleSearchChange = (e) => {
+    const [filteredLobbies, setFilteredLobbies] = useState([]); // New state for filtered lobbies
+
+    const handleSearchChange = (e) => {
         const value = e.target.value;
         setSearchTerm(value);
 
         if (value.trim() === '') {
-            // If the search term is empty, show all lobbies
+            // Show all lobbies if search input is empty
             setFilteredLobbies(lobbiesData);
         } else {
-            // Filter lobbies by code
+            // Filter lobbies by code or name
             setFilteredLobbies(
-                lobbiesData.filter(lobby => lobby.code.includes(value.trim()))
+                lobbiesData.filter(
+                    (lobby) =>
+                        lobby.code.toLowerCase().includes(value.toLowerCase()) || // Match code
+                        lobby.name.toLowerCase().includes(value.toLowerCase())    // Match name (optional)
+                )
             );
         }
     };
