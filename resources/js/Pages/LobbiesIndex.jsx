@@ -48,6 +48,7 @@ export default function LobbiesIndex({ auth, lobbies }) {
 
     useEffect(() => {
         setLobbiesData(lobbies.data || []); 
+        setFilteredLobbies(lobbies.data || []); // Initialize filtered lobbies
     }, [lobbies]);
 
 
@@ -210,27 +211,13 @@ export default function LobbiesIndex({ auth, lobbies }) {
         >
             <div className="container mx-auto px-4 max-w-7xl space-y-8">
                 <Head title="Game Lobbies" />
-                {/* Search Bar */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: "spring", stiffness: 100 }}
-                    className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-lg"
-                >
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                        placeholder="Search by lobby code..."
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </motion.div>
                 <motion.div 
                     initial={{ y: -50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 100 }}
-                    className="bg-white border border-slate-100 shadow-2xl rounded-3xl p-6 flex justify-between items-center space-x-4"
+                    className="bg-white border border-slate-100 shadow-2xl rounded-3xl p-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4"
                 >
+                    {/* Header Text */}
                     <div className="flex items-center space-x-6">
                         <div className="bg-blue-100 p-4 rounded-2xl shadow-md">
                             <Server className="text-blue-700 w-10 h-10" />
@@ -245,45 +232,63 @@ export default function LobbiesIndex({ auth, lobbies }) {
                         </div>
                     </div>
 
-                    <div className="flex space-x-4">
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleRefresh}
-                            disabled={isLoading}
-                            className={`px-6 py-3 rounded-xl transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 shadow-lg ${isLoading 
-                                ? 'bg-slate-400 text-white cursor-not-allowed' 
-                                : 'bg-slate-800 text-white hover:bg-slate-700'
-                            }`}
-                        >
-                            <motion.div
-                                animate={{ 
-                                    rotate: isLoading ? 360 : 0,
-                                    transition: { 
-                                        repeat: isLoading ? Infinity : 0, 
-                                        duration: 0.8, 
-                                        ease: "linear" 
-                                    }
-                                }}
-                                className="flex justify-center items-center"
-                            >
-                                <RefreshCcw className="w-5 h-5" />
-                            </motion.div>
-                            {isLoading ? '' : ''}
-                        </motion.button>
-                        
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setIsModalOpen(true)}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 ease-in-out flex items-center space-x-2 shadow-lg"
-                        >
-                            <Plus className="w-5 h-5 mr-2" />
-                            Create Lobby
-                        </motion.button>
-                    </div>
-                </motion.div>
+                    {/* Search Bar, Refresh, and Create Lobby Buttons */}
+    <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+        {/* Search Bar */}
+        <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 100 }}
+            className="flex items-center w-full sm:w-auto"
+        >
+            <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by code..."
+                className="w-full sm:w-64 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+            />
+        </motion.div>
 
+        {/* Refresh Button */}
+        <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className={`px-6 py-3 rounded-xl transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 shadow-lg ${isLoading 
+                ? 'bg-slate-400 text-white cursor-not-allowed' 
+                : 'bg-slate-800 text-white hover:bg-slate-700'
+            }`}
+        >
+            <motion.div
+                animate={{ 
+                    rotate: isLoading ? 360 : 0,
+                    transition: { 
+                        repeat: isLoading ? Infinity : 0, 
+                        duration: 0.8, 
+                        ease: "linear" 
+                    }
+                }}
+                className="flex justify-center items-center"
+            >
+                <RefreshCcw className="w-5 h-5" />
+            </motion.div>
+            <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
+        </motion.button>
+        
+        {/* Create Lobby Button */}
+        <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsModalOpen(true)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 ease-in-out flex items-center space-x-2 shadow-lg"
+        >
+            <Plus className="w-5 h-5" />
+            <span>Create Lobby</span>
+        </motion.button>
+    </div>
+</motion.div>
                 <motion.div 
                     initial="hidden"
                     animate="visible"
