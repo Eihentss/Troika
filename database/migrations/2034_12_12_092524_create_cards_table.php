@@ -18,9 +18,7 @@ class CreateCardsTable extends Migration
             $table->string('value');
             $table->timestamps();
         
-            // Pievieno ārējo atslēgu
-            $table->foreign('player_id')->references('id')->on('players')->onDelete('cascade');
-        });
+            $table->foreign('player_id')->references('id')->on('users')->onDelete('cascade');        });
     }
 
     public function down()
