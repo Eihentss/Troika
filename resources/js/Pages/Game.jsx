@@ -129,14 +129,14 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
             <div className="cards">
                 <div className="face-down">
                     {playerCards.faceDown.map((card) => (
-                        <div key={card.code} className="card">
+                        <div key={card.code} className="card ">
                             <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
                         </div>
                     ))}
                 </div>
                 <div className="face-up">
                     {playerCards.faceUp.map((card) => (
-                        <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
+                        <div key={card.code} className="card tilted-card" onClick={() => handleCardPlay(card)}>
                             <img src={card.image} alt={`${card.value} of ${card.suit}`} />
                         </div>
                     ))}

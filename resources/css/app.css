@@ -15,13 +15,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 10px;
+    margin: 0px;
 }
 
 .player-name {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: bold;
-    margin-bottom: 10px;
+    margin-bottom: 0px;
 }
 
 .cards {
@@ -42,12 +42,12 @@
     justify-content: center;
     align-items: center;
     position: absolute;
-    top: -30px; /* Move face-up cards a little above */
+    top: -10px; /* Move face-up cards a little above */
 }
 
 .card {
-    width: 100px;
-    height: 150px;
+    width: 70px;
+    height: 90%;
     margin: 20px;
     transition: transform 0.3s ease;
 }
@@ -84,14 +84,14 @@
 }
 .third-player {
     position: absolute;
-    left: 0;
+    left: -4%;
     top: 40%;
     transform: rotate(270deg); /* Tilt the card slightly to the right */
 }
 
 .four-player {
     position: absolute;
-    right: 0;
+    right: -4%;
     top: 40%;
     transform: rotate(90deg); /* Tilt the card slightly to the right */
 }
