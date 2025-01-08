@@ -157,7 +157,7 @@ public function switchTurn($lobbyId)
             $deckId = $deckResponse->json()['deck_id'];
             
             // Draw cards
-            $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=18");
+            $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=54");
             if (!$drawResponse->successful()) {
                 Log::error('Failed to draw cards', [
                     'lobby_id' => $lobbyId,

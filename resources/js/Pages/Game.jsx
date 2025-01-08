@@ -102,34 +102,51 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
                 </div>
             </div>
 
-            {players.map((player) => {
-                const playerCards = cards[player.id] || { faceUp: [], faceDown: [] };
-                const positionClass = player.id === currentUserId ? 'bottom-player' : 'other-player';
+            {players.map((player, index) => {
+    const playerCards = cards[player.id] || { faceUp: [], faceDown: [] };
+    let positionClass = 'second-player';
 
-                return (
-                    <div className={`player ${positionClass}`} key={player.id}>
-                        <div className="player-name">
-                            <strong>{player.name}</strong>
+    // Set position for the current user (bottom of the screen)
+    if (player.id === 1) {
+        positionClass = 'bottom-player';
+    } 
+    // Set position for the third player (left side of the screen)
+    else if (index === 2) {
+        positionClass = 'third-player';
+    }
+    else if (index === 3) {
+        positionClass = 'four-player';
+    }
+    else if (index === 4) {
+        positionClass = 'four-player';
+    }
+
+    return (
+        <div className={`player ${positionClass}`} key={player.id}>
+            <div className="player-name">
+                <strong>{player.name}</strong>
+            </div>
+            <div className="cards">
+                <div className="face-down">
+                    {playerCards.faceDown.map((card) => (
+                        <div key={card.code} className="card">
+                            <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
                         </div>
-                        <div className="cards">
-                            <div className="face-down">
-                                {playerCards.faceDown.map((card) => (
-                                    <div key={card.code} className="card">
-                                        <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="face-up">
-                                {playerCards.faceUp.map((card) => (
-                                    <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
-                                        <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                                    </div>
-                                ))}
-                            </div>
+                    ))}
+                </div>
+                <div className="face-up">
+                    {playerCards.faceUp.map((card) => (
+                        <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
+                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
                         </div>
-                    </div>
-                );
-            })}
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+})}
+
+
         </div>
     );
 };

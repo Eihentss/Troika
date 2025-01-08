@@ -71,7 +71,7 @@
 }
 
 /* Pārējie spēlētāji */
-.other-player {
+.second-player {
     position: absolute;
     top: 0%;
     left: 40%;
@@ -81,4 +81,17 @@
 .card.disabled {
     cursor: not-allowed;
     opacity: 0.5;
+}
+.third-player {
+    position: absolute;
+    left: 0;
+    top: 40%;
+    transform: rotate(270deg); /* Tilt the card slightly to the right */
+}
+
+.four-player {
+    position: absolute;
+    right: 0;
+    top: 40%;
+    transform: rotate(90deg); /* Tilt the card slightly to the right */
 }
