@@ -77,3 +77,8 @@
     left: 40%;
     /* Papildu stils dinamiskam izvietojumam var tikt pievienots */
 }   
+
+.card.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

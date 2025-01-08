@@ -39,6 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/lobbies/{lobbyId}/leave', [LobbyController::class, 'leaveLobby']);
     Route::post('/api/lobbies/{lobby}/toggle-ready', [LobbyController::class, 'toggleReadyStatus']);
 
+    Route::post('/game/{lobbyId}/play-card', [GameController::class, 'playCard']);
 
     Route::post('/api/lobbies/{lobby}/update-settings', [LobbyController::class, 'updateSettings'])->middleware('auth');
 

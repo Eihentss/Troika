@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 
-const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
+const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPlayerId = null }) => {
     const [gameInitialized, setGameInitialized] = useState(false);
     const [cards, setCards] = useState({});
-    const [currentTurn, setCurrentTurn] = useState(null);
-    const [playedCard, setPlayedCard] = useState(null); 
+    const [currentTurn, setCurrentTurn] = useState(currentTurnPlayerId);
+    const [playedCards, setPlayedCards] = useState([]);
 
     useEffect(() => {
         const initializeGame = async () => {
@@ -22,10 +22,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                 }
             } else {
                 try {
-                    // Updated route to match Laravel route
                     await axios.post(`/game/${lobby.id}/initialize`);
-                    const randomPlayerIndex = Math.floor(Math.random() * players.length);
-                    setCurrentTurn(players[randomPlayerIndex].id);
                     setGameInitialized(true);
                 } catch (error) {
                     console.error('Error initializing game:', error);
@@ -35,7 +32,6 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
         const fetchCards = async () => {
             try {
-                // Updated route to match Laravel route
                 const response = await axios.get(`/game/${lobby.id}/cards`);
                 const playerCards = response.data;
                 
@@ -62,23 +58,28 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
         }
     }, [lobby.id, is_creator, gameInitialized]);
 
+    const handleCardPlay = async (card) => {
+        if (currentUserId !== currentTurn) {
+            alert("It's not your turn!");
+            return;
+        }
+    
+        try {
+            const response = await axios.post(`/game/${lobby.id}/play-card`, { card_code: card.code });
+            setPlayedCards((prev) => [...prev, response.data.card]);
+            setCurrentTurn(response.data.nextPlayerId);
+        } catch (error) {
+            console.error('Error playing card:', error);
+        }
+    };
+
     const handleLeaveGame = () => {
         router.get(route('lobbies.index'));
     };
 
-    const handleCardClick = (card, playerId) => {
-        // Only allow card placement if it's the player's turn
-        if (currentTurn === playerId && currentUserId === playerId) {
-            setPlayedCard(card);
-            // Switch turn to the next player
-            const currentPlayerIndex = players.findIndex(p => p.id === currentTurn);
-            const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
-            setCurrentTurn(players[nextPlayerIndex].id);
-        }
-    };
-    
+    const currentTurnPlayer = players.find(player => player.id === currentTurn);
+
     return (
-        
         <div className="game-container">
             <button
                 onClick={handleLeaveGame}
@@ -87,22 +88,17 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                 Leave Game
             </button>
 
-                        {/* Turn Indicator */}
-                        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-100 px-4 py-2 rounded-lg shadow-md">
-                {currentTurn && (
-                    <div className="text-center">
-                        <span className="font-semibold">Current Turn: </span>
-                        {players.find(p => p.id === currentTurn)?.name}
-                        {currentTurn === currentUserId && " (Your Turn)"}
-                    </div>
-                )}
-            </div>
+            {/* Current turn information */}
+            <div className="absolute top-4 left-4 bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+            Current Turn: {currentTurnPlayer ? currentTurnPlayer.name : 'Unknown'}
+        </div>
 
-
-            
+            {/* Played cards */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-4 border-green-500 rounded-lg bg-green-50/20">
                 <div className="w-full h-full flex items-center justify-center text-green-600 font-semibold">
-                    Drop Cards Here
+                    {playedCards.map((card) => (
+                        <img key={card.code} src={card.image} alt={`${card.value} of ${card.suit}`} />
+                    ))}
                 </div>
             </div>
 
@@ -111,7 +107,6 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                 const positionClass = player.id === currentUserId ? 'bottom-player' : 'other-player';
 
                 return (
-                    
                     <div className={`player ${positionClass}`} key={player.id}>
                         <div className="player-name">
                             <strong>{player.name}</strong>
@@ -125,21 +120,14 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                                 ))}
                             </div>
                             <div className="face-up">
-                                    {playerCards.faceUp.map((card, index) => (
-                                        <div 
-                                            key={card.code} 
-                                            className={`card ${index !== 0 ? 'tilted-card' : ''} ${
-                                                currentTurn && player.id === currentUserId ? 'cursor-pointer hover:scale-105' : ''
-                                            }`}
-                                            onClick={() => handleCardClick(card, player.id)}
-                                        >
-                                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                                        </div>
-                                    ))}
-                                </div>
+                                {playerCards.faceUp.map((card) => (
+                                    <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
+                                        <img src={card.image} alt={`${card.value} of ${card.suit}`} />
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                    
                 );
             })}
         </div>
