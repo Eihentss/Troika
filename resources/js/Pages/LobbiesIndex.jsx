@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import CreateLobbyModal from '../Components/CreateLobbyModal';
+import SearchBar from '../Components/SearchBar';
+import PasswordModal from '../Components/PasswordModal';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 import { 
@@ -21,30 +23,10 @@ export default function LobbiesIndex({ auth, lobbies }) {
     const [lobbiesData, setLobbiesData] = useState([]); 
     const [isLoading, setIsLoading] = useState(false);
     const [selectedLobbyId, setSelectedLobbyId] = useState(null);
-    const [password, setPassword] = useState('');
     const [showPasswordModal, setShowPasswordModal] = useState(false);
-    const [passwordError, setPasswordError] = useState('');
-    const [searchTerm, setSearchTerm] = useState(''); // Search term state
     const [filteredLobbies, setFilteredLobbies] = useState([]); // New state for filtered lobbies
 
-    const handleSearchChange = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
 
-        if (value.trim() === '') {
-            // Show all lobbies if search input is empty
-            setFilteredLobbies(lobbiesData);
-        } else {
-            // Filter lobbies by code or name
-            setFilteredLobbies(
-                lobbiesData.filter(
-                    (lobby) =>
-                        lobby.code.toLowerCase().includes(value.toLowerCase()) || // Match code
-                        lobby.name.toLowerCase().includes(value.toLowerCase())    // Match name (optional)
-                )
-            );
-        }
-    };
 
     useEffect(() => {
         setLobbiesData(lobbies.data || []); 
@@ -79,7 +61,7 @@ export default function LobbiesIndex({ auth, lobbies }) {
         if (isPrivate) {
             setSelectedLobbyId(lobbyId);
             setShowPasswordModal(true);
-            setPasswordError('');
+
         } else {
             try {
                 const response = await axios.post(`/lobbies/${lobbyId}/join`);
@@ -91,72 +73,8 @@ export default function LobbiesIndex({ auth, lobbies }) {
             }
         }
     };
-    const handlePasswordSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const response = await axios.post(`/lobbies/${selectedLobbyId}/join`, {
-                password: password
-            });
-            if (response.status === 200) {
-                setShowPasswordModal(false);
-                setPassword('');
-                window.location.href = `/api/lobbies/${selectedLobbyId}`;
-            }
-        } catch (error) {
-            if (error.response?.status === 403) {
-                setPasswordError('Incorrect password');
-            } else {
-                setPasswordError(error.response?.data?.message || 'Failed to join lobby');
-            }
-        }
-    };
-    const PasswordModal = () => (
-        showPasswordModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <motion.div 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
-                >
-                    <h3 className="text-xl font-bold text-slate-800 mb-4">Enter Lobby Password</h3>
-                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                        <div>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter password"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                autoFocus
-                            />
-                            {passwordError && (
-                                <p className="text-red-500 text-sm mt-1">{passwordError}</p>
-                            )}
-                        </div>
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowPasswordModal(false);
-                                    setPassword('');
-                                    setPasswordError('');
-                                }}
-                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-                            >
-                                Join Lobby
-                            </button>
-                        </div>
-                    </form>
-                </motion.div>
-            </div>
-        )
-    );
+
+    
 
     const handleJoinBack = async (e, lobbyId) => {
     try {
@@ -231,6 +149,17 @@ export default function LobbiesIndex({ auth, lobbies }) {
                             </p>
                         </div>
                     </div>
+                        <motion.div 
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center space-x-2 bg-white px-4 py-2 rounded-xl shadow-md border border-slate-100"
+                        >
+                            <Users className="w-5 h-5 text-green-500" />
+                            <span className="text-blue-700 font-medium">
+                                {auth?.user?.name || 'Guest'}
+                            </span>
+                        </motion.div>
+
 
                     {/* Search Bar, Refresh, and Create Lobby Buttons */}
     <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
@@ -241,13 +170,12 @@ export default function LobbiesIndex({ auth, lobbies }) {
             transition={{ type: "spring", stiffness: 100 }}
             className="flex items-center w-full sm:w-auto"
         >
-            <input
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search by code..."
-                className="w-full sm:w-64 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-            />
+
+                    <SearchBar
+                    lobbies={lobbiesData}
+                    onSearch={(filtered) => setFilteredLobbies(filtered)}
+                    
+                />
         </motion.div>
 
         {/* Refresh Button */}
@@ -274,7 +202,7 @@ export default function LobbiesIndex({ auth, lobbies }) {
             >
                 <RefreshCcw className="w-5 h-5" />
             </motion.div>
-            <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
+            <span>{isLoading ? 'Refresh' : 'Refresh'}</span>
         </motion.button>
         
         {/* Create Lobby Button */}
@@ -441,6 +369,12 @@ export default function LobbiesIndex({ auth, lobbies }) {
                     onClose={() => setIsModalOpen(false)} 
                     auth={auth}
                 />
+ <PasswordModal 
+    showPasswordModal={showPasswordModal}
+    selectedLobbyId={selectedLobbyId}
+    onClose={() => setShowPasswordModal(false)}
+    onSuccess={() => setShowPasswordModal(false)}
+/>
             </div>
         </motion.div>
     );
