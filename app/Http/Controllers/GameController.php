@@ -157,7 +157,7 @@ public function switchTurn($lobbyId)
             $deckId = $deckResponse->json()['deck_id'];
             
             // Draw cards
-            $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=54");
+            $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=52");
             if (!$drawResponse->successful()) {
                 Log::error('Failed to draw cards', [
                     'lobby_id' => $lobbyId,
@@ -169,13 +169,15 @@ public function switchTurn($lobbyId)
 
             $cards = $drawResponse->json()['cards'];
 
+            $remainigCard = 0;
+
             // Begin database transaction
             \DB::beginTransaction();
             try {
                 foreach ($lobby->players as $index => $player) {
                     // Deal face-down cards
                     for ($i = 0; $i < 3; $i++) {
-                        $card = $cards[$index * 3 + $i];
+                        $card = $cards[$index * 3 + $i + 0];
                         Card::create([
                             'player_id' => $player->id,
                             'type' => 'face_down',
@@ -184,11 +186,13 @@ public function switchTurn($lobbyId)
                             'suit' => $card['suit'],
                             'value' => $card['value'],
                         ]);
+
+                        $remainigCard++;
                     }
 
                     // Deal face-up cards
                     for ($i = 0; $i < 3; $i++) {
-                        $card = $cards[$index * 3 + $i + 9];
+                        $card = $cards[$index * 3 + $i + 3];
                         Card::create([
                             'player_id' => $player->id,
                             'type' => 'face_up',
@@ -197,7 +201,37 @@ public function switchTurn($lobbyId)
                             'suit' => $card['suit'],
                             'value' => $card['value'],
                         ]);
+
+                        $remainigCard++;
                     }
+
+                    for ($i = 0; $i < 3; $i++) {
+                        $card = $cards[$index * 3 + $i + 6];
+                        Card::create([
+                            'player_id' => $player->id,
+                            'type' => 'hand',
+                            'code' => $card['code'],
+                            'image' => $card['image'],
+                            'suit' => $card['suit'],
+                            'value' => $card['value'],
+                        ]);
+
+                        $remainigCard++;
+                    }
+
+                    
+                }
+
+                for ($i = $remainigCard; $i < count($cards); $i++) {
+                    $card = $cards[$i];
+                    Card::create([
+                        'player_id' => null,
+                        'type' => 'in_deck',
+                        'code' => $card['code'],
+                        'image' => $card['image'],
+                        'suit' => $card['suit'],
+                        'value' => $card['value'],
+                    ]);
                 }
 
                 // Update lobby status
@@ -233,13 +267,7 @@ public function switchTurn($lobbyId)
     public function getCards($lobbyId)
     {
         try {
-            $lobby = Lobby::with('players')->findOrFail($lobbyId);
-            
-            $cards = [];
-            foreach ($lobby->players as $player) {
-                $playerCards = Card::where('player_id', $player->id)->get();
-                $cards[$player->id] = $playerCards;
-            }
+            $cards = Card::all();
             
             return response()->json($cards);
         } catch (Exception $e) {

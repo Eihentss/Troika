@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPlayerId = null }) => {
     const [gameInitialized, setGameInitialized] = useState(false);
-    const [cards, setCards] = useState({});
+    const [cards, setCards] = useState([]);
     const [currentTurn, setCurrentTurn] = useState(currentTurnPlayerId);
     const [playedCards, setPlayedCards] = useState([]);
 
@@ -33,17 +33,9 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
         const fetchCards = async () => {
             try {
                 const response = await axios.get(`/game/${lobby.id}/cards`);
-                const playerCards = response.data;
+                const playerCards = response.data
                 
-                const organizedCards = {};
-                Object.keys(playerCards).forEach(playerId => {
-                    organizedCards[playerId] = {
-                        faceDown: playerCards[playerId].filter(card => card.type === 'face_down'),
-                        faceUp: playerCards[playerId].filter(card => card.type === 'face_up')
-                    };
-                });
-                
-                setCards(organizedCards);
+                setCards(playerCards);
             } catch (error) {
                 console.error('Error fetching cards:', error);
             }
@@ -77,6 +69,24 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
         router.get(route('lobbies.index'));
     };
 
+    const getPositionClasses = (player, index) => {
+        let positionClass = 'second-player';
+        let handClass = 'hand-top';
+
+        if (player.id === currentUserId) {
+            positionClass = 'bottom-player';
+            handClass = 'hand-bottom';
+        } else if (index === 2) {
+            positionClass = 'third-player';
+            handClass = 'hand-left';
+        } else if (index === 3) {
+            positionClass = 'four-player';
+            handClass = 'hand-right';
+        }
+
+        return { positionClass, handClass };
+    };
+
     const currentTurnPlayer = players.find(player => player.id === currentTurn);
 
     return (
@@ -103,23 +113,16 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
             </div>
 
             {players.map((player, index) => {
-    const playerCards = cards[player.id] || { faceUp: [], faceDown: [] };
-    let positionClass = 'second-player';
 
-    // Set position for the current user (bottom of the screen)
-    if (player.id === 1) {
-        positionClass = 'bottom-player';
-    } 
-    // Set position for the third player (left side of the screen)
-    else if (index === 2) {
-        positionClass = 'third-player';
-    }
-    else if (index === 3) {
-        positionClass = 'four-player';
-    }
-    else if (index === 4) {
-        positionClass = 'four-player';
-    }
+    const { positionClass, handClass } = getPositionClasses(player, index);
+
+    const playerCards = cards.filter(card => card.player_id === player.id);
+
+    const handCards = playerCards.filter(card => card.type === "hand");
+    const faaceUpCards = playerCards.filter(card => card.type === "face_up");
+    const faceDownCards = playerCards.filter(card => card.type === "face_down");
+
+    console.log(playerCards);
 
     return (
         <div className={`player ${positionClass}`} key={player.id}>
@@ -128,15 +131,22 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
             </div>
             <div className="cards">
                 <div className="face-down">
-                    {playerCards.faceDown.map((card) => (
+                    {faceDownCards.map((card) => (
                         <div key={card.code} className="card ">
                             <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
                         </div>
                     ))}
                 </div>
                 <div className="face-up">
-                    {playerCards.faceUp.map((card) => (
+                    {faaceUpCards.map((card) => (
                         <div key={card.code} className="card tilted-card" onClick={() => handleCardPlay(card)}>
+                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
+                        </div>
+                    ))}
+                </div>
+                <div className={`hand ${handClass}`}>
+                    {handCards.map((card) => (
+                        <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
                             <img src={card.image} alt={`${card.value} of ${card.suit}`} />
                         </div>
                     ))}

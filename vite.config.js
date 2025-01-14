@@ -14,7 +14,7 @@ export default defineConfig({
         host: '0.0.0.0',  // Vai tieši varat ievadīt IP adresi
         port: 5173,        // Pārliecinieties, ka ports ir atbilstošs
         hmr: {
-          host: '192.168.8.102',  // Ja nepieciešams, iestatiet HMR host
+          host: '10.13.59.35',  // Ja nepieciešams, iestatiet HMR host
         }
       }
 });

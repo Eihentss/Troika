@@ -10,15 +10,16 @@ class CreateCardsTable extends Migration
     {
         Schema::create('cards', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('player_id'); // Pareizais tips
-            $table->enum('type', ['face_up', 'face_down']);
+            $table->unsignedBigInteger('player_id')->nullable(); // Pareizais tips
+            $table->enum('type', ['face_up', 'face_down','hand', 'played', 'discarded','in_deck']);
             $table->string('code');
             $table->string('image');
             $table->string('suit');
             $table->string('value');
             $table->timestamps();
         
-            $table->foreign('player_id')->references('id')->on('users')->onDelete('cascade');        });
+            $table->foreign('player_id')->references('id')->on('users')->onDelete('cascade'); 
+        });
     }
 
     public function down()
