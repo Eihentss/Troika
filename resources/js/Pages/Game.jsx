@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import Dropdown from '../Components/Dropdown';
 
 const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
     // Previous state declarations remain the same
@@ -55,40 +54,49 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
         }
     }, [lobby.id, is_creator, gameInitialized]);
 
-    const handleCardPlay = async (card) => {
-        if (currentTurn === players.find(player => player.id === currentUserId)?.name) {
-            console.log('My turn to play');
+const handleCardPlay = async (card) => {
+    if (!card || !card.code) {
+        console.error('Invalid card object:', card);
+        return;
+    }
 
-            setAnimatingCard(card.code);
+    if (currentTurn === players.find((player) => player.id === currentUserId)?.name) {
+        console.log('My turn to play:', card);
 
-            try {
-                const response = await axios.post(`/game/${lobby.id}/play-card`, { card_code: card.code });
-                
-                setTimeout(() => {
-                    // Add the played card to the list of played cards
-                    setPlayedCards((prev) => [...prev, response.data.playedCard]);
+        setAnimatingCard(card);
 
-                    // Optionally, update the player's hand by adding the new cards received
-                    const newCards = response.data.newCards;
-                    setCards((prevCards) => [
-                        ...prevCards.filter(c => c.code !== card.code),
-                        ...newCards
-                    ]);
+        try {
+            const response = await axios.post(`/game/${lobby.id}/play-card`, { card: { code: card } });
+            console.log('Response from backend:', response);
 
-                    setAnimatingCard(null);
-                }, 500);
-            } catch (error) {
-                console.error('Error playing card:', error);
-                setAnimatingCard(null); 
-            }
-        } else {
-            setNotification({
-                visible: true,
-                message: "It's not your turn!" 
-            });
-            console.log('Error playing card: Not your turn');
+            setTimeout(() => {
+                setPlayedCards((prev) => [...prev, response.data.playedCard]);
+
+                const newCards = response.data.newCards || [];
+                setCards((prevCards) => [
+                    ...prevCards.filter((c) => c.code !== card.code),
+                    ...newCards,
+                ]);
+
+                setNotification({
+                    visible: true,
+                    message: response.data.message || 'Card played successfully!',
+                });
+
+                setAnimatingCard(null);
+            }, 500);
+        } catch (error) {
+            console.error('Error playing card:', error.response?.data || error.message);
+            setAnimatingCard(null);
         }
-    };
+    } else {
+        setNotification({
+            visible: true,
+            message: "It's not your turn!",
+        });
+        console.log('Error playing card: Not your turn');
+    }
+};
 
 
     useEffect(() => {
@@ -108,6 +116,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
     const handleDragStart = (card) => {
         setDraggedCard(card);  // Store dragged card
+        console.log('Dragged card:', card);
     };
 
     const handleDrop = (e) => {
@@ -116,10 +125,12 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
             handleCardPlay(draggedCard);  // Play the card when dropped
             setDraggedCard(null);  // Reset the dragged card
         }
+
     };
 
     const handleDragOver = (e) => {
         e.preventDefault();  // Allow drop by preventing default behavior
+
     };
 
 
@@ -338,7 +349,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                                 <div className={`hand ${handClass}`}>
                                     {handCards.map((card) => (
                                         <div
-                                            key={`${card.code}-${index}`}  // Use a combination of card.code and index to ensure uniqueness
+                                            key={`${card.code}`}  // Use a combination of card.code and index to ensure uniqueness
                                             className={`card ${animatingCard === card.code ? 'animate-to-center' : ''}`}
                                             
                                             draggable="true"

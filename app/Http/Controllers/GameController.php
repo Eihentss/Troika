@@ -53,7 +53,7 @@ class GameController extends Controller
     }
 
 
-public function playCard($lobbyId)
+public function playCard($lobbyId, Request $request)
 {
     // Get the current player (the one who is playing)
     $user = auth()->user();
@@ -147,7 +147,8 @@ public function playCard($lobbyId)
     // Return success response with the played card and any new cards given
     return response()->json([
         'playedCard' => $card,
-        'newCards' => $cardsToGive > 0 ? $randomCards : [] // Include new cards if any
+        'newCards' => $cardsToGive > 0 ? $randomCards : [], // Include new cards if any
+        'message' => "Played card: {$card->suit} {$card->value} (Code: {$card->code})"
     ]);
 }
 
