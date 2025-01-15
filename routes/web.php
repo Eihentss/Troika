@@ -43,6 +43,8 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/api/lobbies/{lobby}/update-settings', [LobbyController::class, 'updateSettings'])->middleware('auth');
 
+    Route::get('/game/{lobby}/current-turn-player', [GameController::class, 'getCurrentTurnPlayer']);
+    Route::get('/game/{lobby}/game', [GameController::class, 'game']);
 
     Route::post('/game/{lobbyId}/initialize', [GameController::class, 'initialize'])
     ->name('game.initialize');

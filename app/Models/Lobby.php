@@ -52,17 +52,14 @@ class Lobby extends Model
 
     public function players()
     {
-        
         return $this->belongsToMany(User::class, 'lobby_user')
-            ->withPivot('current_turn','status') // Include the status field from the pivot table
-            ->withTimestamps();
-            
-
+                    ->withPivot('current_turn', 'status')
+                    ->withTimestamps();
     }
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'lobby_user')->withPivot('status')->withTimestamps();
+        return $this->belongsToMany(User::class, 'lobby_user')->withPivot('current_turn','status')->withTimestamps();
     }
 
     public function cards()

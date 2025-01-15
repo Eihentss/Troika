@@ -53,91 +53,109 @@ class GameController extends Controller
     }
 
 
-    public function playCard(Request $request, $lobbyId)
-    {
-        try {
-            $lobby = Lobby::with(['players', 'cards'])->findOrFail($lobbyId);
-    
-            // Check if the current user is in the lobby
-            if (!$lobby->players->contains(auth()->id())) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-    
-            // Validate the card input
-            $request->validate([
-                'card_code' => 'required|string',
-            ]);
-    
-            // Check if it's the user's turn
-            if ($lobby->current_turn_player_id !== auth()->id()) {
-                return response()->json(['error' => 'Not your turn'], 403);
-            }
-    
-            // Find the card and ensure it belongs to the current player
-            $card = Card::where('player_id', auth()->id())
-                ->where('code', $request->input('card_code'))
-                ->where('type', '!=', 'played') // Ensure card hasn't been played already
+public function playCard($lobbyId)
+{
+    // Get the current player (the one who is playing)
+    $user = auth()->user();
+
+    // Find the card that the player is trying to play from their hand
+    $card = Card::where('lobby_id', $lobbyId)
+                ->where('player_id', $user->id)
+                ->where('type', 'hand') // Ensure it's in their hand
                 ->first();
-    
-            if (!$card) {
-                return response()->json(['error' => 'Card not found or already played'], 404);
+
+    // If no card is found in the player's hand, check if they can draw from the face_up pile
+    if (!$card) {
+        // Attempt to get cards from the face_up pile if the hand is empty
+        $cardFromFaceUp = Card::where('lobby_id', $lobbyId)
+                              ->where('player_id', $user->id)
+                              ->where('type', 'face_up') // Look for cards in face_up
+                              ->first();
+
+        if (!$cardFromFaceUp) {
+            // If no card in hand or face_up, try to draw from face_down
+            $cardFromFaceDown = Card::where('lobby_id', $lobbyId)
+                                    ->where('player_id', $user->id)
+                                    ->where('type', 'face_down') // Look for cards in face_down
+                                    ->first();
+
+            if (!$cardFromFaceDown) {
+                return response()->json(['error' => 'No cards available to play'], 400); // If no card is found in any pile
             }
-    
-            // Update the card type to 'played'
-            $card->type = 'played';
-            $card->save();
-    
-            // Get the next player in the lobby
-            $currentPlayerIndex = $lobby->players->search(function($player) {
-                return $player->id === auth()->id();
-            });
-    
-            $nextPlayerIndex = ($currentPlayerIndex + 1) % count($lobby->players);
-            $nextPlayer = $lobby->players->values()->get($nextPlayerIndex);
-    
-            // Update the turn to the next player
-            $lobby->current_turn_player_id = $nextPlayer->id;
-            $lobby->save();
-    
-            return response()->json([
-                'message' => 'Card played successfully',
-                'card' => $card,
-                'nextPlayerId' => $nextPlayer->id
+
+            // Mark the card from face_down as played
+            $cardFromFaceDown->update(['type' => 'played']);
+            return response()->json(['playedCard' => $cardFromFaceDown]);
+        }
+
+        // Mark the card from face_up as played
+        $cardFromFaceUp->update(['type' => 'played']);
+        return response()->json(['playedCard' => $cardFromFaceUp]);
+    }
+
+    // Mark the card from hand as played
+    $card->update(['type' => 'played']);
+
+    // Check how many cards the player currently has in their hand
+    $playerHandCount = Card::where('lobby_id', $lobbyId)
+                           ->where('player_id', $user->id)
+                           ->where('type', 'hand')
+                           ->count();
+
+    // If the player has fewer than 3 cards in hand, give them more cards
+    $cardsToGive = 3 - $playerHandCount;
+    if ($cardsToGive > 0) {
+        // First, try to get cards from the deck
+        $randomCards = Card::where('lobby_id', $lobbyId)
+                           ->where('type', 'in_deck')
+                           ->inRandomOrder() // Randomly select cards
+                           ->limit($cardsToGive)
+                           ->get();
+
+        if ($randomCards->isEmpty()) {
+            // If no cards are left in the deck, try to get cards from the face_up pile
+            $randomCards = Card::where('lobby_id', $lobbyId)
+                               ->where('type', 'face_up')
+                               ->inRandomOrder() // Randomly select cards
+                               ->limit($cardsToGive)
+                               ->get();
+        }
+
+        if ($randomCards->isEmpty()) {
+            // If no cards are available in the face_up pile, try the face_down pile
+            $randomCards = Card::where('lobby_id', $lobbyId)
+                               ->where('type', 'face_down')
+                               ->inRandomOrder() // Randomly select cards
+                               ->limit($cardsToGive)
+                               ->get();
+        }
+
+        // If there are still no cards left, return an error
+        if ($randomCards->isEmpty()) {
+            return response()->json(['error' => 'No cards available to draw'], 400);
+        }
+
+        // Move cards from either the deck, face_up, or face_down pile to the player's hand
+        foreach ($randomCards as $randomCard) {
+            $randomCard->update([
+                'type' => 'hand',
+                'player_id' => $user->id // Assign the card to the player
             ]);
-        } catch (Exception $e) {
-            Log::error('Failed to play card', [
-                'lobby_id' => $lobbyId,
-                'error' => $e->getMessage()
-            ]);
-    
-            return response()->json([
-                'error' => 'Failed to play card',
-                'message' => $e->getMessage()
-            ], 500);
         }
     }
 
+    // Return success response with the played card and any new cards given
+    return response()->json([
+        'playedCard' => $card,
+        'newCards' => $cardsToGive > 0 ? $randomCards : [] // Include new cards if any
+    ]);
+}
 
-    public function advanceTurn($lobbyId)
-    {
-        $lobby = Lobby::with(['players' => function ($query) {
-            $query->orderBy('lobby_user.turn_order');
-        }])->findOrFail($lobbyId);
-    
-        $currentPlayerPivot = $lobby->players->where('id', $lobby->current_turn_user_id)->first()->pivot;
-        $nextTurnOrder = $currentPlayerPivot->turn_order + 1;
-    
-        $nextPlayer = $lobby->players->where('pivot.turn_order', $nextTurnOrder)->first();
-        if (!$nextPlayer) {
-            // If no next player, wrap around to the first player
-            $nextPlayer = $lobby->players->where('pivot.turn_order', 1)->first();
-        }
-    
-        $lobby->current_turn_user_id = $nextPlayer->id;
-        $lobby->save();
-    
-        return $nextPlayer;
-    }
+
+
+
+
+
 
 public function initialize($lobbyId)
 {
@@ -187,17 +205,15 @@ public function initialize($lobbyId)
 
         \DB::beginTransaction();
         try {
-            // Assign turn order to players
+            // Shuffle players and assign turn order
             $players = $lobby->players->shuffle();
-            foreach ($players as $index => $player) {
-                $player->pivot->turn_order = $index + 1;
+            $firstPlayer = $players->first();
+
+            foreach ($players as $player) {
+                // Set 'current_turn' in the pivot table
+                $player->pivot->current_turn = ($player->id === $firstPlayer->id) ? 'true' : 'false';
                 $player->pivot->save();
             }
-
-            // Set the first player's turn
-            $firstPlayer = $players->first();
-            $lobby->current_turn_user_id = $firstPlayer->id;
-            $lobby->save();
 
             // Deal cards to players
             foreach ($players as $player) {
@@ -233,7 +249,7 @@ public function initialize($lobbyId)
 
             $lobby->update(['status' => 'playing']);
             \DB::commit();
-            
+
             Log::info('Successfully dealt cards for lobby: ' . $lobbyId);
             return response()->json(['message' => 'Game initialized successfully']);
         } catch (Exception $e) {
@@ -258,6 +274,47 @@ public function initialize($lobbyId)
         ], 500);
     }
 }
+
+
+
+public function getCurrentTurnPlayer($lobbyId)
+{
+    $player = \DB::table('lobby_user')
+        ->join('users', 'lobby_user.user_id', '=', 'users.id')
+        ->where('lobby_user.lobby_id', $lobbyId)
+        ->where('lobby_user.current_turn', true)
+        ->select('users.name')
+        ->first();
+
+    if ($player) {
+        return response()->json(['name' => $player->name]);
+    }
+
+    return response()->json(['error' => 'Current turn player not found'], 404);
+}
+
+
+
+
+public function game($lobbyId)
+{
+    try {
+            $cards = Card::all();
+
+            return response()->json($cards);
+        } catch (Exception $e) {
+            Log::error('Failed to retrieve cards', [
+                'lobby_id' => $lobbyId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to retrieve cards',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+}
+
 
     public function getCards($lobbyId)
     {
@@ -288,12 +345,12 @@ public function initialize($lobbyId)
         $lobby->delete();
 
             return response()->json([
-                'message' => 'Eihentas ir mazu bernu pisejs',
+                'message' => 'You have left the game successfully',
             ], 200);
 }
 
             return response()->json([
-                'message' => 'Eihentas ir mazu bernu pisejs',
+                'message' => 'You are not the creator of this lobby',
             ], 500);
     }
 }

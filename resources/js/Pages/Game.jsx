@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
+import Dropdown from '../Components/Dropdown';
 
-const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPlayerId = null }) => {
+const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
     // Previous state declarations remain the same
     const [gameInitialized, setGameInitialized] = useState(false);
     const [cards, setCards] = useState([]);
-    const [currentTurn, setCurrentTurn] = useState(currentTurnPlayerId);
+    const [currentTurn, setCurrentTurn] = useState();
     const [playedCards, setPlayedCards] = useState([]);
     const [animatingCard, setAnimatingCard] = useState(null);
+    const [notification, setNotification] = useState({ visible: false, message: '' });
+    const [draggedCard, setDraggedCard] = useState(null);  // To store the dragged card
+    const [flippedCards, setFlippedCards] = useState([]);  // To track which cards are flipped
 
     // Previous useEffect and handler functions remain the same
     useEffect(() => {
@@ -52,31 +56,119 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
     }, [lobby.id, is_creator, gameInitialized]);
 
     const handleCardPlay = async (card) => {
-        if (currentUserId !== currentTurn) {
-            alert("It's not your turn!");
-            return;
-        }
+        if (currentTurn === players.find(player => player.id === currentUserId)?.name) {
+            console.log('My turn to play');
 
-        setAnimatingCard(card.code);
-        
-        try {
-            const response = await axios.post(`/game/${lobby.id}/play-card`, { card_code: card.code });
-            
-            setTimeout(() => {
-                setPlayedCards((prev) => [...prev, response.data.card]);
-                setCurrentTurn(response.data.nextPlayerId);
-                setAnimatingCard(null);
-            }, 500);
-        } catch (error) {
-            console.error('Error playing card:', error);
-            setAnimatingCard(null);
+            setAnimatingCard(card.code);
+
+            try {
+                const response = await axios.post(`/game/${lobby.id}/play-card`, { card_code: card.code });
+                
+                setTimeout(() => {
+                    // Add the played card to the list of played cards
+                    setPlayedCards((prev) => [...prev, response.data.playedCard]);
+
+                    // Optionally, update the player's hand by adding the new cards received
+                    const newCards = response.data.newCards;
+                    setCards((prevCards) => [
+                        ...prevCards.filter(c => c.code !== card.code),
+                        ...newCards
+                    ]);
+
+                    setAnimatingCard(null);
+                }, 500);
+            } catch (error) {
+                console.error('Error playing card:', error);
+                setAnimatingCard(null); 
+            }
+        } else {
+            setNotification({
+                visible: true,
+                message: "It's not your turn!" 
+            });
+            console.log('Error playing card: Not your turn');
         }
     };
+
+
+    useEffect(() => {
+        if (notification.visible) {
+            const timer = setTimeout(() => {
+                setNotification({ visible: false, message: '' });
+            }, 3000); 
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);
+
 
     const handleLeaveGame = () => {
         router.get(route('lobbies.index'));
     };
 
+
+    const handleDragStart = (card) => {
+        setDraggedCard(card);  // Store dragged card
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        if (draggedCard) {
+            handleCardPlay(draggedCard);  // Play the card when dropped
+            setDraggedCard(null);  // Reset the dragged card
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();  // Allow drop by preventing default behavior
+    };
+
+
+    useEffect(() => {
+    const fetchCurrentTurnPlayer = async () => {
+        try {
+            const response = await axios.get(`/game/${lobby.id}/current-turn-player`);
+            if (response.data.name) {
+                setCurrentTurn(response.data.name);
+            }
+        } catch (error) {
+            console.error('Error fetching current turn player:', error);
+        }
+    };
+
+
+    const interval = setInterval(fetchCurrentTurnPlayer, 5000);
+    fetchCurrentTurnPlayer();
+
+    return () => clearInterval(interval); // Cleanup interval on unmount
+    }, [lobby.id]);
+
+        useEffect(() => {
+    const fetch_game = async () => {
+        try {
+            const response = await axios.get(`/game/${lobby.id}/game`);
+        setCards(response.data);
+        } catch (error) {
+            console.error('Error fetching current turn player:', error);
+        }
+    };
+
+
+    const interval = setInterval(fetch_game, 2000);
+    fetch_game();
+
+    return () => clearInterval(interval); // Cleanup interval on unmount
+    }, [lobby.id]);
+
+
+    const handleCardClick = (card) => {
+        setFlippedCards((prevFlippedCards) => {
+            // Only flip the card if it's not already flipped
+            if (!prevFlippedCards.some((flippedCard) => flippedCard.code === card.code)) {
+                return [...prevFlippedCards, card];
+            }
+            return prevFlippedCards;
+        });
+    };
     const getPositionClasses = (player, index) => {
         let positionClass = 'second-player';
         let handClass = 'hand-top';
@@ -94,8 +186,6 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
 
         return { positionClass, handClass };
     };
-
-    const currentTurnPlayer = players.find(player => player.id === currentTurn);
     const allDiscardedCards = cards.filter(card => card.type === "discarded");
     const allDeckCards = cards.filter(card => card.type === "in_deck");
     const discardedCount = allDiscardedCards.length;
@@ -103,6 +193,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
 
     return (
         <div className="game-container">
+
             <button
                 onClick={handleLeaveGame}
                 className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200"
@@ -110,10 +201,18 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
                 Leave Game
             </button>
 
-            <div className="absolute top-4 left-4 bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md">
-                Current Turn: {currentTurnPlayer ? currentTurnPlayer.name : 'Unknown'}
+            <div
+                className={`absolute top-4 left-4 font-bold py-2 px-4 rounded-lg shadow-md ${
+                    currentTurn === players.find(player => player.id === currentUserId)?.name ? 'bg-green-500' : 'bg-red-500'
+                }`}
+            >
+                Current Turn: {currentTurn || 'Unknown'}
             </div>
-
+                {notification.visible && (
+                    <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-4 py-4 rounded-lg shadow-md">
+                        <div className="text-center font-bold text-lg mb-2  ">{notification.message}</div>
+                    </div>
+                )}
             {/* Game Center Area */}
             
             <div className="center-area-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
@@ -142,11 +241,15 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
                     ))}
                 </div>
                 {/* Play Area */}
-                <div className="play-area relative w-48 h-48 border-4 border-green-500 rounded-lg bg-green-50/20">
+  <div
+                    className="play-area relative w-48 h-48 border-4 border-green-500 rounded-lg bg-green-50/20"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                >
                     {playedCards.map((card, index) => (
                         <div
                             key={card.code}
-                            className="played-card absolute"
+                            className="deck-card absolute w-24"
                             style={{
                                 zIndex: index,
                                 transform: `rotate(${Math.random() * 30 - 15}deg)`
@@ -196,34 +299,58 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
                         </div>
                         <div className="cards">
                             <div className="face-down">
-                                {faceDownCards.map((card) => (
-                                    <div key={card.code} className="card">
-                                        <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
-                                    </div>
-                                ))}
-                            </div>
+                             {faceDownCards.map((card) => (               
+                                <div
+                                    key={card.code}
+                                    className="card"
+                                    onClick={() => handleCardClick(card)}
+                                >
+                                    {flippedCards.some((flippedCard) => flippedCard.code === card.code) ? (
+                                <img
+                                    src={card.image}
+                                    alt={`Card ${card.code}`}
+                                    draggable="true"
+                                    onDragStart={(e) => handleDragStart(e, card)}
+                                />
+                            ) : (
+                                <img
+                                    src="https://deckofcardsapi.com/static/img/back.png"
+                                    alt="Card Back"
+                                />
+                            )}
+                        </div>
+                        ))}                
+                        </div>                
                             <div className="face-up">
                                 {faceUpCards.map((card) => (
                                     <div
-                                        key={card.code}
+                                        key={`${card.code}-${index}`}  // Use a combination of card.code and index to ensure uniqueness
                                         className={`card tilted-card ${animatingCard === card.code ? 'animate-to-center' : ''}`}
-                                        onClick={() => handleCardPlay(card)}
+                                       
+                                        draggable="true"
+                                        onDragStart={() => handleDragStart(card)} // Handle dragging
                                     >
                                         <img src={card.image} alt={`${card.value} of ${card.suit}`} />
                                     </div>
                                 ))}
                             </div>
-                            <div className={`hand ${handClass}`}>
-                                {handCards.map((card) => (
-                                    <div
-                                        key={card.code}
-                                        className={`card ${animatingCard === card.code ? 'animate-to-center' : ''}`}
-                                        onClick={() => handleCardPlay(card)}
-                                    >
-                                        <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                                    </div>
-                                ))}
-                            </div>
+                             {(player.name ) ? (
+                                <div className={`hand ${handClass}`}>
+                                    {handCards.map((card) => (
+                                        <div
+                                            key={`${card.code}-${index}`}  // Use a combination of card.code and index to ensure uniqueness
+                                            className={`card ${animatingCard === card.code ? 'animate-to-center' : ''}`}
+                                            
+                                            draggable="true"
+                                            onDragStart={() => handleDragStart(card)} // Handle dragging
+                                        >
+                                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                                 ) : (
+                                <div className="hand-container"></div>
+                            )}
                         </div>
                     </div>
                 );

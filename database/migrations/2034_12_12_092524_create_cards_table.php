@@ -12,7 +12,7 @@ class CreateCardsTable extends Migration
             $table->id();
             $table->foreignId('lobby_id')->constrained('lobbies')->onDelete('cascade');
             $table->unsignedBigInteger('player_id')->nullable(); // Pareizais tips
-            $table->enum('type', ['face_up', 'face_down','hand', 'played', 'discarded','in_deck']);
+            $table->enum('type', ['face_up', 'face_down','hand', 'played', 'discarded','in_deck','in_play_area_last_card'])->default('in_deck');
             $table->string('code');
             $table->string('image');
             $table->string('suit');
