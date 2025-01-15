@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 
-const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPlayerId = null }) => {
+const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPlayerId = null, redirect }) => {
     const [gameInitialized, setGameInitialized] = useState(false);
     const [cards, setCards] = useState([]);
     const [currentTurn, setCurrentTurn] = useState(currentTurnPlayerId);
@@ -34,7 +34,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
             try {
                 const response = await axios.get(`/game/${lobby.id}/cards`);
                 const playerCards = response.data
-                
+
                 setCards(playerCards);
             } catch (error) {
                 console.error('Error fetching cards:', error);
@@ -55,7 +55,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
             alert("It's not your turn!");
             return;
         }
-    
+
         try {
             const response = await axios.post(`/game/${lobby.id}/play-card`, { card_code: card.code });
             setPlayedCards((prev) => [...prev, response.data.card]);
@@ -66,7 +66,8 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
     };
 
     const handleLeaveGame = () => {
-        router.get(route('lobbies.index'));
+        router.post(`/game/${lobby.id}/delete`);
+        window.location = '/api/lobbies'
     };
 
     const getPositionClasses = (player, index) => {
@@ -98,12 +99,10 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
                 Leave Game
             </button>
 
-            {/* Current turn information */}
             <div className="absolute top-4 left-4 bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md">
-            Current Turn: {currentTurnPlayer ? currentTurnPlayer.name : 'Unknown'}
-        </div>
+                Current Turn: {currentTurnPlayer ? currentTurnPlayer.name : 'Unknown'}
+            </div>
 
-            {/* Played cards */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-4 border-green-500 rounded-lg bg-green-50/20">
                 <div className="w-full h-full flex items-center justify-center text-green-600 font-semibold">
                     {playedCards.map((card) => (
@@ -114,47 +113,47 @@ const Game = ({ lobby, players, is_creator = false, currentUserId, currentTurnPl
 
             {players.map((player, index) => {
 
-    const { positionClass, handClass } = getPositionClasses(player, index);
+                const { positionClass, handClass } = getPositionClasses(player, index);
 
-    const playerCards = cards.filter(card => card.player_id === player.id);
+                const playerCards = cards.filter(card => card.player_id === player.id);
 
-    const handCards = playerCards.filter(card => card.type === "hand");
-    const faaceUpCards = playerCards.filter(card => card.type === "face_up");
-    const faceDownCards = playerCards.filter(card => card.type === "face_down");
+                const handCards = playerCards.filter(card => card.type === "hand");
+                const faaceUpCards = playerCards.filter(card => card.type === "face_up");
+                const faceDownCards = playerCards.filter(card => card.type === "face_down");
 
-    console.log(playerCards);
-
-    return (
-        <div className={`player ${positionClass}`} key={player.id}>
-            <div className="player-name">
-                <strong>{player.name}</strong>
-            </div>
-            <div className="cards">
-                <div className="face-down">
-                    {faceDownCards.map((card) => (
-                        <div key={card.code} className="card ">
-                            <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
+                return (
+                    <>
+                        <div className={`player ${positionClass}`} key={player.id}>
+                            <div className="cards">
+                                <div className="face-down">
+                                    {faceDownCards.map((card) => (
+                                        <div key={card.code} className="card ">
+                                            <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="face-up">
+                                    {faaceUpCards.map((card) => (
+                                        <div key={card.code} className="card tilted-card" onClick={() => handleCardPlay(card)}>
+                                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className={`hand ${handClass}`}>
+                                    {handCards.map((card) => (
+                                        <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
+                                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="player-name">
+                                <strong>{player.name}</strong>
+                            </div>
                         </div>
-                    ))}
-                </div>
-                <div className="face-up">
-                    {faaceUpCards.map((card) => (
-                        <div key={card.code} className="card tilted-card" onClick={() => handleCardPlay(card)}>
-                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                        </div>
-                    ))}
-                </div>
-                <div className={`hand ${handClass}`}>
-                    {handCards.map((card) => (
-                        <div key={card.code} className="card" onClick={() => handleCardPlay(card)}>
-                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-})}
+                    </>
+                );
+            })}
 
 
         </div>

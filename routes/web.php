@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/game/{lobbyId}/initialize', [GameController::class, 'initialize'])
     ->name('game.initialize');
+    Route::post('/game/{lobbyId}/delete', [GameController::class, 'leaveGame'])->name("game.delete");
 Route::get('/game/{lobbyId}/cards', [GameController::class, 'getCards'])
     ->name('game.cards');
 
