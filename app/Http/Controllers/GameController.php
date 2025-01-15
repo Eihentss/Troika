@@ -56,50 +56,60 @@ class GameController extends Controller
     public function playCard(Request $request, $lobbyId)
     {
         try {
-            $lobby = Lobby::with('players')->findOrFail($lobbyId);
-
+            $lobby = Lobby::with(['players', 'cards'])->findOrFail($lobbyId);
+    
             // Check if the current user is in the lobby
             if (!$lobby->players->contains(auth()->id())) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
-
+    
             // Validate the card input
             $request->validate([
                 'card_code' => 'required|string',
             ]);
-
+    
             // Check if it's the user's turn
-
-
-
+            if ($lobby->current_turn_player_id !== auth()->id()) {
+                return response()->json(['error' => 'Not your turn'], 403);
+            }
+    
             // Find the card and ensure it belongs to the current player
             $card = Card::where('player_id', auth()->id())
-            ->where('code', $request->input('card_code'))
-            ->first();
-        if (!$card) {
-            return response()->json(['error' => 'Card not found'], 404);
-        }
-
-            // Save the played card in a new "played_cards" table or update the card type
-            $playedCard = $card->replicate();
-            $playedCard->type = 'played';
-            $playedCard->save();
-
-            // Remove the card from the player's hand
-            $card->delete();
-
+                ->where('code', $request->input('card_code'))
+                ->where('type', '!=', 'played') // Ensure card hasn't been played already
+                ->first();
+    
+            if (!$card) {
+                return response()->json(['error' => 'Card not found or already played'], 404);
+            }
+    
+            // Update the card type to 'played'
+            $card->type = 'played';
+            $card->save();
+    
+            // Get the next player in the lobby
+            $currentPlayerIndex = $lobby->players->search(function($player) {
+                return $player->id === auth()->id();
+            });
+    
+            $nextPlayerIndex = ($currentPlayerIndex + 1) % count($lobby->players);
+            $nextPlayer = $lobby->players->values()->get($nextPlayerIndex);
+    
             // Update the turn to the next player
-            $nextPlayer = $lobby->players->pluck('id')->filter(fn($id) => $id !== auth()->id())->first();
-            $lobby->current_turn_player_id = $nextPlayer;
+            $lobby->current_turn_player_id = $nextPlayer->id;
             $lobby->save();
-
-            return response()->json(['message' => 'Card played successfully', 'card' => $playedCard]);
+    
+            return response()->json([
+                'message' => 'Card played successfully',
+                'card' => $card,
+                'nextPlayerId' => $nextPlayer->id
+            ]);
         } catch (Exception $e) {
             Log::error('Failed to play card', [
                 'lobby_id' => $lobbyId,
                 'error' => $e->getMessage()
             ]);
-
+    
             return response()->json([
                 'error' => 'Failed to play card',
                 'message' => $e->getMessage()
@@ -108,79 +118,93 @@ class GameController extends Controller
     }
 
 
-public function switchTurn($lobbyId)
-{
-    $lobby = Lobby::findOrFail($lobbyId);
-
-    if (auth()->id() !== $lobby->creator_id) {
-        return response()->json(['error' => 'Unauthorized'], 403);
+    public function advanceTurn($lobbyId)
+    {
+        $lobby = Lobby::with(['players' => function ($query) {
+            $query->orderBy('lobby_user.turn_order');
+        }])->findOrFail($lobbyId);
+    
+        $currentPlayerPivot = $lobby->players->where('id', $lobby->current_turn_user_id)->first()->pivot;
+        $nextTurnOrder = $currentPlayerPivot->turn_order + 1;
+    
+        $nextPlayer = $lobby->players->where('pivot.turn_order', $nextTurnOrder)->first();
+        if (!$nextPlayer) {
+            // If no next player, wrap around to the first player
+            $nextPlayer = $lobby->players->where('pivot.turn_order', 1)->first();
+        }
+    
+        $lobby->current_turn_user_id = $nextPlayer->id;
+        $lobby->save();
+    
+        return $nextPlayer;
     }
 
-    $players = $lobby->players;
-    $currentTurnIndex = $players->pluck('id')->search($lobby->current_turn);
+public function initialize($lobbyId)
+{
+    try {
+        $lobby = Lobby::with('players')->findOrFail($lobbyId);
 
-    $nextTurnIndex = ($currentTurnIndex + 1) % $players->count();
-    $nextTurnPlayerId = $players[$nextTurnIndex]->id;
+        // Verify user permissions
+        if (auth()->id() !== $lobby->creator_id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
-    $lobby->update(['current_turn' => $nextTurnPlayerId]);
+        // Check if cards are already dealt
+        $existingCards = Card::whereIn('player_id', $lobby->players->pluck('id'))->exists();
+        if ($existingCards) {
+            return response()->json(['message' => 'Cards already dealt']);
+        }
 
-    return response()->json(['current_turn' => $nextTurnPlayerId]);
-}
+        // Log the start of card dealing
+        Log::info('Starting to deal cards for lobby: ' . $lobbyId);
 
-    public function initialize($lobbyId)
-    {
+        // Make API request to get new deck
+        $deckResponse = Http::get('https://deckofcardsapi.com/api/deck/new/shuffle/');
+        if (!$deckResponse->successful()) {
+            Log::error('Failed to create deck', [
+                'lobby_id' => $lobbyId,
+                'response' => $deckResponse->json()
+            ]);
+            return response()->json(['error' => 'Failed to create deck'], 500);
+        }
+
+        $deckId = $deckResponse->json()['deck_id'];
+
+        // Draw cards
+        $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=52");
+        if (!$drawResponse->successful()) {
+            Log::error('Failed to draw cards', [
+                'lobby_id' => $lobbyId,
+                'deck_id' => $deckId,
+                'response' => $drawResponse->json()
+            ]);
+            return response()->json(['error' => 'Failed to draw cards'], 500);
+        }
+
+        $cards = $drawResponse->json()['cards'];
+        $cardIndex = 0;
+        $status = ["hand", "face_up", "face_down"];
+
+        \DB::beginTransaction();
         try {
-            $lobby = Lobby::with('players')->findOrFail($lobbyId);
-
-            // Verify user permissions
-            if (auth()->id() !== $lobby->creator_id) {
-                return response()->json(['error' => 'Unauthorized'], 403);
+            // Assign turn order to players
+            $players = $lobby->players->shuffle();
+            foreach ($players as $index => $player) {
+                $player->pivot->turn_order = $index + 1;
+                $player->pivot->save();
             }
 
-            // Check if cards are already dealt
-            $existingCards = Card::whereIn('player_id', $lobby->players->pluck('id'))->exists();
-            if ($existingCards) {
-                return response()->json(['message' => 'Cards already dealt']);
-            }
+            // Set the first player's turn
+            $firstPlayer = $players->first();
+            $lobby->current_turn_user_id = $firstPlayer->id;
+            $lobby->save();
 
-            // Log the start of card dealing
-            Log::info('Starting to deal cards for lobby: ' . $lobbyId);
-
-            // Make API request to get new deck
-            $deckResponse = Http::get('https://deckofcardsapi.com/api/deck/new/shuffle/');
-            if (!$deckResponse->successful()) {
-                Log::error('Failed to create deck', [
-                    'lobby_id' => $lobbyId,
-                    'response' => $deckResponse->json()
-                ]);
-                return response()->json(['error' => 'Failed to create deck'], 500);
-            }
-
-            $deckId = $deckResponse->json()['deck_id'];
-
-            // Draw cards
-            $drawResponse = Http::get("https://deckofcardsapi.com/api/deck/{$deckId}/draw/?count=52");
-            if (!$drawResponse->successful()) {
-                Log::error('Failed to draw cards', [
-                    'lobby_id' => $lobbyId,
-                    'deck_id' => $deckId,
-                    'response' => $drawResponse->json()
-                ]);
-                return response()->json(['error' => 'Failed to draw cards'], 500);
-            }
-
-            $cards = $drawResponse->json()['cards'];
-
-            $cardIndex = 0;
-
-            $status = ["hand", "face_up", "face_down"];
-
-            \DB::beginTransaction();
-            try {
-                foreach ($lobby->players as $index => $player) {
-                    foreach($status as $cardStatus) {
+            // Deal cards to players
+            foreach ($players as $player) {
+                foreach ($status as $cardStatus) {
                     for ($i = 0; $i < 3; $i++) {
                         Card::create([
+                            'lobby_id' => $lobbyId,
                             'player_id' => $player->id,
                             'type' => $cardStatus,
                             'code' => $cards[$cardIndex]['code'],
@@ -188,53 +212,52 @@ public function switchTurn($lobbyId)
                             'suit' => $cards[$cardIndex]['suit'],
                             'value' => $cards[$cardIndex]['value'],
                         ]);
-
                         $cardIndex++;
                     }
-                    }
-
                 }
-
-                for ($i = $cardIndex; $i < count($cards); $i++) {
-                    $card = $cards[$i];
-                    Card::create([
-                        'player_id' => null,
-                        'type' => 'in_deck',
-                        'code' => $card['code'],
-                        'image' => $card['image'],
-                        'suit' => $card['suit'],
-                        'value' => $card['value'],
-                    ]);
-                }
-
-                $lobby->update(['status' => 'playing']);
-
-                \DB::commit();
-                Log::info('Successfully dealt cards for lobby: ' . $lobbyId);
-
-                return response()->json(['message' => 'Game initialized successfully']);
-            } catch (Exception $e) {
-                \DB::rollBack();
-                Log::error('Failed to save cards to database', [
-                    'lobby_id' => $lobbyId,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                throw $e;
             }
+
+            // Add remaining cards to deck
+            for ($i = $cardIndex; $i < count($cards); $i++) {
+                $card = $cards[$i];
+                Card::create([
+                    'lobby_id' => $lobbyId,
+                    'player_id' => null,
+                    'type' => 'in_deck',
+                    'code' => $card['code'],
+                    'image' => $card['image'],
+                    'suit' => $card['suit'],
+                    'value' => $card['value'],
+                ]);
+            }
+
+            $lobby->update(['status' => 'playing']);
+            \DB::commit();
+            
+            Log::info('Successfully dealt cards for lobby: ' . $lobbyId);
+            return response()->json(['message' => 'Game initialized successfully']);
         } catch (Exception $e) {
-            Log::error('Game initialization failed', [
+            \DB::rollBack();
+            Log::error('Failed to save cards to database', [
                 'lobby_id' => $lobbyId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
-            return response()->json([
-                'error' => 'Game initialization failed',
-                'message' => $e->getMessage()
-            ], 500);
+            throw $e;
         }
+    } catch (Exception $e) {
+        Log::error('Game initialization failed', [
+            'lobby_id' => $lobbyId,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'error' => 'Game initialization failed',
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
 
     public function getCards($lobbyId)
     {

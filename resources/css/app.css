@@ -3,149 +3,120 @@
 @tailwind utilities;
 
 .game-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 0px;
-    height: 100vh;
-    position: relative;
+    @apply flex flex-col items-center h-screen relative;
+}
+
+.center-area-container {
+    @apply flex items-center justify-center gap-8;
+}
+
+.play-area, .discard-pile, .deck-pile {
+    @apply relative flex items-center justify-center;
+}
+
+.played-card, .discarded-card, .deck-card {
+    @apply absolute transition-all duration-300 ease-in-out;
+}
+
+.deck-card {
+    @apply hover:brightness-95;
 }
 
 .player {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 0px;
+    @apply flex flex-col items-center m-0;
 }
 
 .player-name {
-    font-size: 15px;
-    font-weight: bold;
-    margin-bottom: 0px;
+    @apply text-base font-bold mb-0;
+}
+
+.bottom-name {
+    @apply fixed bottom-2 left-1/2 transform -translate-x-1/2;
+}
+
+.top-name {
+    @apply fixed top-2 left-1/2 transform -translate-x-1/2;
 }
 
 .cards {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    @apply relative flex flex-col items-center;
 }
 
-.face-down {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.face-down, .face-up, .hand {
+    @apply flex justify-center items-center;
 }
 
 .face-up {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: absolute;
-    top: -10px;
+    @apply absolute -top-2.5;
 }
 
 .hand {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: absolute;
-    top: 10px;
-    margin: 0px;
+    @apply absolute top-2.5 m-0;
 }
 
 .card {
-    width: 40px;
-    height: 90%;
-    margin: 20px;
-    transition: transform 0.3s ease;
+    @apply w-10 h-[90%] m-5 transition-all duration-300 ease-in-out cursor-pointer;
+}
+
+.card:hover:not(.disabled) {
+    @apply scale-110 z-10;
 }
 
 .tilted-card {
-    transform: rotate(10deg);
+    @apply rotate-[10deg];
 }
 
-.card img {
-    width: 100%;
-    height: auto;
+.animate-to-center {
+    animation: moveToCenter 0.5s forwards;
 }
 
-/* Bottom player - cards point upward */
+@keyframes moveToCenter {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    100% {
+        transform: translate(-50%, -50%) rotate(random(360deg));
+        top: 50vh;
+        left: 50vw;
+    }
+}
+
 .bottom-player {
-    position: absolute;
-    bottom: 10px;
-    left: 40%;
+    @apply absolute bottom-10 left-[40%];
 }
 
-.bottom-player .hand .card {
-    transform: translateY(-20px) rotate(0deg);
-}
-
-/* Top player - cards point downward */
 .second-player {
-    position: absolute;
-    top: 0%;
-    left: 40%;
+    @apply absolute top-0 left-[40%];
 }
 
-.second-player .hand .card {
-    transform: translateY(20px) rotate(180deg);
-}
-
-/* Left player - cards point right */
 .third-player {
-    position: absolute;
-    left: -4%;
-    top: 40%;
+    @apply absolute left-[-4%] top-[40%];
 }
 
-.third-player .hand .card {
-    transform: translateX(20px) rotate(90deg);
-}
-
-/* Right player - cards point left */
 .four-player {
-    position: absolute;
-    right: -4%;
-    top: 40%;
+    @apply absolute right-[-4%] top-[40%];
 }
-
-.four-player .hand .card {
-    transform: translateX(-20px) rotate(-90deg);
-}
-
-.card.disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-/* Hover effect for cards */
-.card:hover:not(.disabled) {
-    transform: scale(1.1);
-    z-index: 10;
-}
-
 
 .hand-bottom {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: absolute;
-    top: -150px;
+    @apply absolute -top-[150px];
 }
 
 .hand-top {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: absolute;
-    top: 150px;
+    @apply absolute top-[150px];
 }
 
-.hand-left {
-    /* Styles for left player's hand */
+.bottom-player .hand .card {
+    @apply -translate-y-5 rotate-0;
 }
 
-.hand-right {
-    /* Styles for right player's hand */
+.second-player .hand .card {
+    @apply translate-y-5 rotate-180;
+}
+
+.third-player .hand .card {
+    @apply translate-x-5 rotate-90;
+}
+
+.four-player .hand .card {
+    @apply -translate-x-5 -rotate-90;
 }

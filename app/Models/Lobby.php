@@ -54,7 +54,7 @@ class Lobby extends Model
     {
         
         return $this->belongsToMany(User::class, 'lobby_user')
-            ->withPivot('status') // Include the status field from the pivot table
+            ->withPivot('current_turn','status') // Include the status field from the pivot table
             ->withTimestamps();
             
 
@@ -65,5 +65,8 @@ class Lobby extends Model
         return $this->belongsToMany(User::class, 'lobby_user')->withPivot('status')->withTimestamps();
     }
 
-
+    public function cards()
+    {
+        return $this->hasMany(Card::class, 'lobby_id');
+    }
 }

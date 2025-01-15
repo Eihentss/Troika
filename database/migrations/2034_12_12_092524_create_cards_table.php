@@ -10,6 +10,7 @@ class CreateCardsTable extends Migration
     {
         Schema::create('cards', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('lobby_id')->constrained('lobbies')->onDelete('cascade');
             $table->unsignedBigInteger('player_id')->nullable(); // Pareizais tips
             $table->enum('type', ['face_up', 'face_down','hand', 'played', 'discarded','in_deck']);
             $table->string('code');
