@@ -72,7 +72,7 @@ public function playCard($lobbyId, Request $request)
                ->first();
 
     if (!$card) {
-        return response()->json(['error' => $user->id], 404);
+        return response()->json(['error' => 'Invalid play - check card pile rules'], 404);
     }
 
     // Determine which pile the card is coming from and validate the play
@@ -306,9 +306,12 @@ public function getCurrentTurnPlayer($lobbyId)
 public function game($lobbyId)
 {
     try {
-            $cards = Card::all();
+        $cards = Card::where('lobby_id', $lobbyId)
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->toArray();  // Convert to array explicitly
 
-            return response()->json($cards);
+        return response()->json($cards);  // This will ensure we send an array
         } catch (Exception $e) {
             Log::error('Failed to retrieve cards', [
                 'lobby_id' => $lobbyId,

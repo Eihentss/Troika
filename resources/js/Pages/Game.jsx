@@ -161,17 +161,27 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
         const fetch_game = async () => {
             try {
                 const response = await axios.get(`/game/${lobby.id}/game`);
-                setCards(response.data);
+                const cardsArray = Array.isArray(response.data) ? response.data : [];
+                
+                // Set regular cards (excluding played ones)
+                setCards(cardsArray.filter(card => card.type !== 'played'));
+                
+                // Get played cards and sort by timestamp in ascending order
+                // This will put newest cards last in the array
+                const playedCardsData = cardsArray
+                    .filter(card => card.type === 'played')
+                    .sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+                
+                setPlayedCards(playedCardsData);
             } catch (error) {
-                console.error('Error fetching current turn player:', error);
+                console.error('Error fetching game data:', error);
             }
         };
-
-
+    
         const interval = setInterval(fetch_game, 2000);
         fetch_game();
-
-        return () => clearInterval(interval); // Cleanup interval on unmount
+    
+        return () => clearInterval(interval);
     }, [lobby.id]);
 
 
@@ -262,7 +272,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                 >
                     {playedCards.map((card, index) => (
                         <div
-                            key={card.code}
+                            key={`${card.code}-${card.updated_at}`}
                             className="deck-card absolute w-24"
                             style={{
                                 zIndex: index,
