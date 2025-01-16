@@ -276,7 +276,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                             className="deck-card absolute w-24"
                             style={{
                                 zIndex: index,
-                                transform: `rotate(${Math.random() * 30 - 15}deg)`
+                                transform: `rotate(${Math.random() * 20 - 15}deg)`
                             }}
                         >
                             <img src={card.image} alt={`${card.value} of ${card.suit}`} className="w-full h-auto" />
@@ -296,11 +296,15 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                             style={{
                                 top: '50%',
                                 left: '50%',
-                                transform: `translate(-50%, -50%) rotate(${Math.random() * 30 - 15}deg)`,
+                                transform: `translate(-50%, -50%)`,
                                 zIndex: index
                             }}
                         >
-                            <img src={card.image} alt={`${card.value} of ${card.suit}`} className="w-full h-auto" />
+                            <img
+                                src="https://deckofcardsapi.com/static/img/back.png"
+                                alt="Card Back"
+                                className="w-full h-auto shadow-md"
+                            />
                         </div>
                     ))}
                 </div>
