@@ -54,137 +54,259 @@ class GameController extends Controller
 
 
 
-    public function playCard($lobbyId, Request $request)
-    {
-        $user = auth()->user();
+  public function playCard($lobbyId, Request $request)
+{
+    $user = auth()->user();
+
+    if (!$request->has('card')) {
+        return response()->json(['error' => 'No card specified'], 400);
+    }
+
+    $cardCode = $request->input('card');
+
+    $card = Card::where('lobby_id', $lobbyId)
+               ->where('player_id', $user->id)
+               ->where('code', $cardCode)
+               ->first();
+
+    if (!$card) {
+        return response()->json(['error' => 'Invalid play - check card pile rules'], 404);
+    }
+
+    $lastPlayedCard = Card::where('lobby_id', $lobbyId)
+                         ->where('type', 'played')
+                         ->orderBy('updated_at', 'desc')
+                         ->first();
+                         
+
+    $valueMap = [
+        'ACE' => 14,
+        'KING' => 13,
+        'QUEEN' => 12,
+        'JACK' => 11,
+        '10' => 15,
+        '9' => 9,
+        '8' => 8,
+        '7' => 7,
+        '6' => 6,
+        '5' => 5,
+        '4' => 4,
+        '3' => 3,
+        '2' => 2
+    ];
+
+    $currentValue = $valueMap[$card->value];
     
-        // Validate the incoming request
-        if (!$request->has('card')) {
-            return response()->json(['error' => 'No card specified'], 400);
+    // Check if last played card was a 6 or if current card is a 6
+    if ($lastPlayedCard && $lastPlayedCard->value !== '6' && $card->value !== '6') {
+        $lastValue = $valueMap[$lastPlayedCard->value];
+        if ($currentValue < $lastValue) {
+            return response()->json([
+                'error' => 'Invalid play - card value must be higher than the previous card'
+            ], 400);
         }
-    
-        $cardCode = $request->input('card');
-    
-        // Find the specific card that's being played
-        $card = Card::where('lobby_id', $lobbyId)
-                   ->where('player_id', $user->id)
-                   ->where('code', $cardCode)
-                   ->first();
-    
-        if (!$card) {
-            return response()->json(['error' => 'Invalid play - check card pile rules'], 404);
-        }
-    
-        // Get the last played card to compare values
-        $lastPlayedCard = Card::where('lobby_id', $lobbyId)
-                             ->where('type', 'played')
-                             ->orderBy('updated_at', 'desc')
-                             ->first();
-    
-        // Convert card values to numeric values for comparison
-        $valueMap = [
-            'ACE' => 14,
-            'KING' => 13,
-            'QUEEN' => 12,
-            'JACK' => 11,
-            '10' => 15,
-            '9' => 9,
-            '8' => 8,
-            '7' => 7,
-            '6' => 6,
-            '5' => 5,
-            '4' => 4,
-            '3' => 3,
-            '2' => 2
-        ];
-    
-        $currentValue = $valueMap[$card->value];
-        
-        // Check if the card value is valid compared to the last played card
-        if ($lastPlayedCard) {
-            $lastValue = $valueMap[$lastPlayedCard->value];
-            if ($currentValue < $lastValue) {
-                return response()->json([
-                    'error' => 'Invalid play - card value must be higher than the previous card'
-                ], 400);
-            }
-        }
-    
-        // Determine which pile the card is coming from and validate the play
-        $validPlay = false;
-    
-        if ($card->type === 'hand') {
-            $validPlay = true;
-        } elseif ($card->type === 'face_up') {
-            // Can only play from face_up if hand is empty
-            $handCount = Card::where('lobby_id', $lobbyId)
-                            ->where('player_id', $user->id)
-                            ->where('type', 'hand')
-                            ->count();
-            $validPlay = $handCount === 0;
-        } elseif ($card->type === 'face_down') {
-            // Can only play from face_down if hand and face_up are empty
-            $otherCardsCount = Card::where('lobby_id', $lobbyId)
-                                  ->where('player_id', $user->id)
-                                  ->whereIn('type', ['hand', 'face_up'])
-                                  ->count();
-            $validPlay = $otherCardsCount === 0;
-        }
-    
-        if (!$validPlay) {
-            return response()->json(['error' => 'Invalid play - check card pile rules'], 400);
-        }
-    
-        // Mark the card as played
-        $card->update(['type' => 'played']);
-    
-        // Check if the played card has value 10
-        if ($card->value === '10') {
-            // Update all played cards to discarded
-            Card::where('lobby_id', $lobbyId)
-                ->where('type', 'played')
-                ->update(['type' => 'discarded']);
-        }
-    
-        // Check if player needs more cards in hand
-        $playerHandCount = Card::where('lobby_id', $lobbyId)
+    }
+
+    $validPlay = false;
+
+    if ($card->type === 'hand') {
+        $validPlay = true;
+    } elseif ($card->type === 'face_up') {
+        $handCount = Card::where('lobby_id', $lobbyId)
+                        ->where('player_id', $user->id)
+                        ->where('type', 'hand')
+                        ->count();
+        $validPlay = $handCount === 0;
+    } elseif ($card->type === 'face_down') {
+        $otherCardsCount = Card::where('lobby_id', $lobbyId)
                               ->where('player_id', $user->id)
-                              ->where('type', 'hand')
+                              ->whereIn('type', ['hand', 'face_up'])
                               ->count();
-    
-        $cardsToGive = 3 - $playerHandCount;
-        $newCards = [];
-    
-        if ($cardsToGive > 0) {
-            // Try to get cards from the deck first
-            $newCards = $this->drawCardsFromSource($lobbyId, $user->id, $cardsToGive, 'in_deck');
-    
-            // If not enough cards in deck, try face_up pile
-            if (count($newCards) < $cardsToGive) {
-                $remainingCards = $cardsToGive - count($newCards);
-                $newCards = array_merge(
-                    $newCards,
-                    $this->drawCardsFromSource($lobbyId, $user->id, $remainingCards, 'face_up')
-                );
-            }
-    
-            // If still not enough, try face_down pile
-            if (count($newCards) < $cardsToGive) {
-                $remainingCards = $cardsToGive - count($newCards);
-                $newCards = array_merge(
-                    $newCards,
-                    $this->drawCardsFromSource($lobbyId, $user->id, $remainingCards, 'face_down')
-                );
-            }
+        $validPlay = $otherCardsCount === 0;
+    }
+
+    if (!$validPlay) {
+        return response()->json(['error' => 'Invalid play - check card pile rules'], 400);
+    }
+
+    $card->update(['type' => 'played']);
+
+    $shouldGetAnotherTurn = false;
+
+    if ($card->value === '10') {
+        Card::where('lobby_id', $lobbyId)
+            ->where('type', 'played')
+            ->update(['type' => 'discarded']);
+        $shouldGetAnotherTurn = true;
+    }
+
+    $playerHandCount = Card::where('lobby_id', $lobbyId)
+                          ->where('player_id', $user->id)
+                          ->where('type', 'hand')
+                          ->count();
+
+    $cardsToGive = 3 - $playerHandCount;
+    $newCards = [];
+
+    if ($cardsToGive > 0) {
+        $newCards = $this->drawCardsFromSource($lobbyId, $user->id, $cardsToGive, 'in_deck');
+
+        if (count($newCards) < $cardsToGive) {
+            $remainingCards = $cardsToGive - count($newCards);
+            $newCards = array_merge(
+                $newCards,
+                $this->drawCardsFromSource($lobbyId, $user->id, $remainingCards, 'face_up')
+            );
         }
+
+        if (count($newCards) < $cardsToGive) {
+            $remainingCards = $cardsToGive - count($newCards);
+            $newCards = array_merge(
+                $newCards,
+                $this->drawCardsFromSource($lobbyId, $user->id, $remainingCards, 'face_down')
+            );
+        }
+    }
+
+    if (!$shouldGetAnotherTurn) {
         $this->changeTurn($lobbyId);
+    }
+
+    return response()->json([
+        'playedCard' => $card->fresh(),
+        'newCards' => $newCards,
+        'message' => "Played card: {$card->suit} {$card->value} (Code: {$card->code})",
+        'clearedPile' => $card->value === '10',
+        'extraTurn' => $shouldGetAnotherTurn
+    ]);
+}
+public function forced($lobbyId, Request $request) 
+{
+    $user = auth()->user();
+
+        $playerAllCards = Card::where('lobby_id', $lobbyId)
+        ->where('player_id', $user->id)
+        ->whereIn('type', ['hand', 'face_up', 'face_down'])
+        ->get();
+
+
+    // Get the last played card
+    $lastPlayedCard = Card::where('lobby_id', $lobbyId)
+        ->where('type', 'played')
+        ->orderBy('updated_at', 'desc')
+        ->first();
+    
+
+        // if ($playerAllCards->count() === 0) {
+        //     return response()->json([
+        //         'message' => 'Winner'
+        //     ]);
+        // }else{
+        //     return response()->json([
+        //         'message' => 'No winner'
+        //     ]);
+        // }
+
+    if (!$lastPlayedCard) {
         return response()->json([
-            'playedCard' => $card->fresh(),
-            'newCards' => $newCards,
-            'message' => "Played card: {$card->suit} {$card->value} (Code: {$card->code})",
-            'clearedPile' => $card->value === '10'
+            'message' => 'No cards have been played yet',
+            'mustPickUp' => false
         ]);
     }
+    
+    // Get all cards in player's possession
+    $playerHand = Card::where('lobby_id', $lobbyId)
+        ->where('player_id', $user->id)
+        ->whereIn('type', ['hand'])
+        ->get();
+
+
+    
+    // Check if player can play any card
+    $canPlayAnyCard = false;
+    foreach ($playerHand as $card) {
+        if ($this->canPlayCard($card, $lastPlayedCard)) {
+            $canPlayAnyCard = true;
+            break;
+        }
+    }
+    
+    if (!$canPlayAnyCard) {
+        \DB::beginTransaction();
+        try {
+            // Move all played cards to player's hand
+            $playedCards = Card::where('lobby_id', $lobbyId)
+                ->where('type', 'played')
+                ->get();
+            
+            foreach ($playedCards as $card) {
+                $card->update([
+                    'type' => 'hand',
+                    'player_id' => $user->id
+                ]);
+            }
+            
+            // Change turn to next player
+            $this->changeTurn($lobbyId);
+            
+            \DB::commit();
+            
+            if ($playerAllCards->count() === 0) {
+                return response()->json([
+                    'message' => 'Winner'
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Picked up all played cards',
+                'pickedUpCards' => $playedCards,
+                'mustPickUp' => true
+            ]);
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return response()->json([
+                'message' => 'Error processing card pickup',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        
+    }
+                return response()->json([
+                'message' => 'dosnt have to pick up',
+                'pickedUpCards' => $lastPlayedCard,
+                'mustPickUp' => false,
+                'canPlayAnyCard' => $canPlayAnyCard,
+                'playerHand' => $playerHand,
+                'lastPlayedCard' => $lastPlayedCard
+            ]);
+
+    
+}
+
+private function canPlayCard($card, $lastPlayedCard) 
+{
+    $valueMap = [
+        'ACE' => 14,
+        'KING' => 13,
+        'QUEEN' => 12,
+        'JACK' => 11,
+        '10' => 15,
+        '9' => 9,
+        '8' => 8,
+        '7' => 7,
+        '6' => 6,
+        '5' => 5,
+        '4' => 4,
+        '3' => 3,
+        '2' => 2
+    ];
+    
+    if ($card->value === '6') return true;
+    if ($lastPlayedCard->value === '6') return true;
+    return $valueMap[$card->value] >= $valueMap[$lastPlayedCard->value];
+}
+
 
     private function changeTurn($lobbyId)
 {
@@ -380,13 +502,28 @@ public function getCurrentTurnPlayer($lobbyId)
 
 public function game($lobbyId)
 {
+
+    $user = auth()->user();
+
+        $playerAllCards = Card::where('lobby_id', $lobbyId)
+        ->where('player_id', $user->id)
+        ->whereIn('type', ['hand', 'face_up', 'face_down'])
+        ->get();
+
+        $statusMessage = ($playerAllCards->count() === 0) ? "Winner" : "No winner";
+
+
     try {
         $cards = Card::where('lobby_id', $lobbyId)
             ->orderBy('updated_at', 'desc')
             ->get()
             ->toArray();  // Convert to array explicitly
 
-        return response()->json($cards);  // This will ensure we send an array
+               return response()->json([
+            'cards' => $cards,
+            'lobbyId' => $lobbyId,
+            'message' => $statusMessage,
+        ]);  // This will ensure we send an array
         } catch (Exception $e) {
             Log::error('Failed to retrieve cards', [
                 'lobby_id' => $lobbyId,

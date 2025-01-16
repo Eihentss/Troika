@@ -14,6 +14,53 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
     const [flippedCards, setFlippedCards] = useState([]);  // To track which cards are flipped
 
     // Previous useEffect and handler functions remain the same
+
+
+        const checkForForcedPickup = async () => {
+        if (currentTurn === players.find(player => player.id === currentUserId)?.name) {
+            try {
+                const response = await axios.post(`/game/${lobby.id}/forced-pickup`, {
+                    checkOnly: true
+                });
+
+                if (response.data.mustPickUp) {
+                    // Update the local state with the new cards
+                    setCards(prevCards => {
+                        const nonPlayedCards = prevCards.filter(card => card.type !== 'played');
+                        const newHandCards = response.data.pickedUpCards.map(card => ({
+                            ...card,
+                            type: 'hand',
+                            player_id: currentUserId
+                        }));
+                        return [...nonPlayedCards, ...newHandCards];
+                    });
+
+                    setPlayedCards([]);
+
+                    setNotification({
+                        visible: true,
+                        message: "No playable cards. Picked up all cards from the pile."
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking for forced pickup:', error);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (currentTurn) {
+            checkForForcedPickup();
+
+            const interval = setInterval(checkForForcedPickup, 5000);
+            checkForForcedPickup();
+
+        return () => clearInterval(interval); // Cleanup interval on unmount
+        }
+    }, [currentTurn]);
+
+
+
     useEffect(() => {
         const initializeGame = async () => {
             if (!is_creator) {
@@ -87,7 +134,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                     message: response.data.message || 'Card played successfully!'
                 });
             } catch (error) {
-                console.error('Error playing card:', error.response?.data || error.message);
+                // console.error('Error playing card:', error.response?.data || error.message);
                 setNotification({
                     visible: true,
                     message: error.response?.data?.error || 'Error playing card'
@@ -119,8 +166,8 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
 
     const handleDragStart = (card) => {
-        setDraggedCard(card);  // Store dragged card
-        console.log('Dragged card:', card);
+            setDraggedCard(card);
+            console.log('Dragged card:', card);
     };
 
     const handleDrop = (e) => {
@@ -151,7 +198,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
         };
 
 
-        const interval = setInterval(fetchCurrentTurnPlayer, 5000);
+        const interval = setInterval(fetchCurrentTurnPlayer, 1000);
         fetchCurrentTurnPlayer();
 
         return () => clearInterval(interval); // Cleanup interval on unmount
@@ -161,7 +208,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
         const fetch_game = async () => {
             try {
                 const response = await axios.get(`/game/${lobby.id}/game`);
-                const cardsArray = Array.isArray(response.data) ? response.data : [];
+                const cardsArray = Array.isArray(response.data.cards) ? response.data.cards : [];
                 
                 // Set regular cards (excluding played ones)
                 setCards(cardsArray.filter(card => card.type !== 'played'));
@@ -186,13 +233,14 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
 
     const handleCardClick = (card) => {
-        setFlippedCards((prevFlippedCards) => {
-            // Only flip the card if it's not already flipped
-            if (!prevFlippedCards.some((flippedCard) => flippedCard.code === card.code)) {
-                return [...prevFlippedCards, card];
-            }
-            return prevFlippedCards;
-        });
+
+            setFlippedCards((prevFlippedCards) => {
+                if (!prevFlippedCards.some((flippedCard) => flippedCard.code === card.code)) {
+                    return [...prevFlippedCards, card];
+                }
+                return prevFlippedCards;
+            });
+        
     };
     const getPositionClasses = (player, index) => {
         let positionClass = 'second-player';
@@ -211,44 +259,73 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
         return { positionClass, handClass };
     };
+
+
+    const canPlayCard = (card, lastPlayedCard) => {
+        if (!lastPlayedCard) return true;
+        
+        const valueMap = {
+            'ACE': 14, 'KING': 13, 'QUEEN': 12, 'JACK': 11,
+            '10': 15, '9': 9, '8': 8, '7': 7, '6': 6,
+            '5': 5, '4': 4, '3': 3, '2': 2
+        };
+
+        // If the last played card was a 6, any card can be played
+        if (lastPlayedCard.value === '6') return true;
+        // If this card is a 6, it can be played on anything
+        if (card.value === '6') return true;
+
+        return valueMap[card.value] >= valueMap[lastPlayedCard.value];
+    };
+
+    const getCardStyle = (card) => {
+        const lastPlayedCard = playedCards[playedCards.length - 1];
+        const isPlayable = canPlayCard(card, lastPlayedCard);
+        const isCurrentPlayerTurn = currentTurn === players.find(player => player.id === currentUserId)?.name;
+
+        return {
+            border: isCurrentPlayerTurn ? (isPlayable ? '2px solid rgb(34, 197, 94)' : '2px solid rgb(239, 68, 68)') : 'none',
+            borderRadius: '8px',
+            transition: 'all 0.3s ease'
+        };
+    };
+
     const allDiscardedCards = cards.filter(card => card.type === "discarded");
     const allDeckCards = cards.filter(card => card.type === "in_deck");
     const discardedCount = allDiscardedCards.length;
     const deckCount = allDeckCards.length;
 
     return (
-        <div className="game-container">
+        <div className="min-h-screen bg-gradient-to-b from-emerald-800 to-emerald-950 relative overflow-hidden">
+    <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
+                <button
+                    onClick={handleLeaveGame}
+                    className="px-6 py-3 bg-red-500/90 hover:bg-red-600/90 text-white font-semibold rounded-full shadow-lg backdrop-blur-sm transition-all duration-300"
+                >
+                    Leave Game
+                </button>
 
-            <button
-                onClick={handleLeaveGame}
-                className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200"
-            >
-                Leave Game
-            </button>
-
-            <div
-                className={`absolute top-4 left-4 font-bold py-2 px-4 rounded-lg shadow-md ${currentTurn === players.find(player => player.id === currentUserId)?.name ? 'bg-green-500' : 'bg-red-500'
-                    }`}
-            >
-                Current Turn: {currentTurn || 'Unknown'}
-            </div>
-            {notification.visible && (
-                <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-4 py-4 rounded-lg shadow-md">
-                    <div className="text-center font-bold text-lg mb-2  ">{notification.message}</div>
+                <div className={`px-6 py-3 rounded-full shadow-lg backdrop-blur-sm ${
+                    currentTurn === players.find(player => player.id === currentUserId)?.name 
+                    ? 'bg-green-500/90 text-white' 
+                    : 'bg-red-500/90 text-white'
+                }`}>
+                    <span className="font-semibold">Current Turn:</span> {currentTurn || 'Unknown'}
                 </div>
-            )}
+            
+            </div>
             {/* Game Center Area */}
 
-            <div className="center-area-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-12">
                 {/* Deck Pile */}
-                <div className="deck-pile relative w-48 h-48 border-4 border-blue-500 rounded-lg bg-blue-50/20">
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full">
-                        {deckCount} cards
+                <div className="relative w-36 h-48 rounded-xl bg-white/10 backdrop-blur-md shadow-xl border-2 border-white/20">
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-blue-500/90 text-white px-4 py-1 rounded-full shadow-lg backdrop-blur-sm">
+                        {deckCount}
                     </div>
                     {allDeckCards.slice(-5).map((_, index) => (
                         <div
                             key={index}
-                            className="deck-card absolute w-24"
+                            className="absolute w-24 transition-all duration-300 hover:translate-y--2"
                             style={{
                                 top: `${50 - index * 2}%`,
                                 left: '50%',
@@ -259,35 +336,37 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                             <img
                                 src="https://deckofcardsapi.com/static/img/back.png"
                                 alt="Card Back"
-                                className="w-full h-auto shadow-md"
+                                className="w-full h-auto rounded-lg shadow-md hover:brightness-100 transition-all duration-300"
                             />
                         </div>
                     ))}
                 </div>
                 {/* Play Area */}
                 <div
-                    className="play-area relative w-48 h-48 border-4 border-green-500 rounded-lg bg-green-50/20"
+                    className="relative w-36 h-48 rounded-xl bg-white/10 backdrop-blur-md shadow-xl border-2 border-white/20"
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
                     {playedCards.map((card, index) => (
                         <div
                             key={`${card.code}-${card.updated_at}`}
-                            className="deck-card absolute w-24"
+                            className="absolute w-24 transition-all duration-300"
                             style={{
-                                zIndex: index,
-                                transform: `rotate(${Math.random() * 20 - 15}deg)`
+                                top: '50%',
+                                left: '50%',
+                                transform: `translate(-50%, -50%) rotate(0deg)`,
+                                zIndex: index
                             }}
                         >
-                            <img src={card.image} alt={`${card.value} of ${card.suit}`} className="w-full h-auto" />
+                            <img src={card.image} alt={`${card.value} of ${card.suit}`} className="w-full h-auto rounded-lg shadow-lg" />
                         </div>
                     ))}
                 </div>
 
                 {/* Discard Pile */}
-                <div className="discard-pile relative w-48 h-48 border-4 border-red-500 rounded-lg bg-red-50/20">
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full">
-                        {discardedCount} cards
+                <div className="relative w-36 h-48 rounded-xl bg-white/10 backdrop-blur-md shadow-xl border-2 border-white/20">
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-500/90 text-white px-4 py-1 rounded-full shadow-lg backdrop-blur-sm">
+                        {discardedCount}
                     </div>
                     {allDiscardedCards.slice(-5).map((card, index) => (
                         <div
@@ -303,7 +382,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                             <img
                                 src="https://deckofcardsapi.com/static/img/back.png"
                                 alt="Card Back"
-                                className="w-full h-auto shadow-md"
+                                className="w-full h-auto rounded-lg shadow-md"
                             />
                         </div>
                     ))}
@@ -322,7 +401,7 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
 
                 return (
                     <div className={`player ${positionClass}`} key={player.id}>
-                        <div className={`player-name ${player.id === currentUserId ? 'bottom-name' : 'top-name'}`}>
+                        <div className={`bg-white/10 backdrop-blur-md px-4 py-2 rounded-full mb-4 text-white font-semibold shadow-lg ${player.id === currentUserId ? 'bottom-name' : 'top-name'}`}>
                             <strong>{player.name}</strong>
                         </div>
                         <div className="cards">
@@ -363,26 +442,36 @@ const Game = ({ lobby, players, is_creator = false, currentUserId }) => {
                                 ))}
                             </div>
                             {(player.name) ? (
-                                <div className={`hand ${handClass}`}>
+                            <div className={`hand ${handClass}`}>
                                     {handCards.map((card) => (
-                                        <div
-                                            key={`${card.code}`}  // Use a combination of card.code and index to ensure uniqueness
+                                    <div
+                                        key={`${card.code}`}
                                             className={`card ${animatingCard === card.code ? 'animate-to-center' : ''}`}
 
-                                            draggable="true"
-                                            onDragStart={() => handleDragStart(card)} // Handle dragging
-                                        >
-                                            <img src={card.image} alt={`${card.value} of ${card.suit}`} />
-                                        </div>
-                                    ))}
+                                        draggable="true"
+                                        onDragStart={() => handleDragStart(card)}
+                                    >
+                                        <img
+                                            src={player.id === currentUserId ? card.image : "https://deckofcardsapi.com/static/img/back.png"}
+                                            alt={player.id === currentUserId ? `${card.value} of ${card.suit}` : "Card Back"}
+                                            className="w-16 h-auto rounded-lg shadow-lg"
+                                            style={player.id === currentUserId ? getCardStyle(card) : {}}
+                                        />
+                                    </div>
+                                ))}
                                 </div>
                             ) : (
-                                <div className="hand-container"></div>
+                                 <div className="hand-container"></div>
                             )}
                         </div>
                     </div>
                 );
             })}
+            {notification.visible && (
+                <div className="fixed bottom-4 right-4 bg-blue-500/90 text-white px-6 py-3 rounded-lg shadow-lg backdrop-blur-sm">
+                    {notification.message}
+                </div>
+            )}
         </div>
     );
 };

@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/game/{lobbyId}/play-card', [GameController::class, 'playCard']);
 
+    Route::post('/game/{lobbyId}/forced-pickup', [GameController::class, 'forced']);
+
     Route::post('/api/lobbies/{lobby}/update-settings', [LobbyController::class, 'updateSettings'])->middleware('auth');
 
     Route::get('/game/{lobby}/current-turn-player', [GameController::class, 'getCurrentTurnPlayer']);

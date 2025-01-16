@@ -19,11 +19,11 @@
 }
 
 .deck-card {
-    @apply hover:brightness-95;
+    @apply hover:brightness-75;
 }
 
 .player {
-    @apply flex flex-col items-center m-0;
+    @apply flex flex-col items-center m-0
 }
 
 .player-name {
@@ -47,15 +47,15 @@
 }
 
 .face-up {
-    @apply absolute -top-2.5;
+    @apply absolute -top-0.5;
 }
 
-.hand {
-    @apply absolute top-2.5 m-0;
-}
+/* .hand {
+    @apply absolute top-1.5 m-0;
+} */
 
 .card {
-    @apply w-10 h-[90%] m-5 transition-all duration-300 ease-in-out cursor-pointer;
+    @apply h-28 w-16 m-3 transition-all duration-100 ease-in-out cursor-pointer;
 }
 
 .card:hover:not(.disabled) {
@@ -86,7 +86,7 @@
 }
 
 .second-player {
-    @apply absolute top-0 left-[40%];
+    @apply absolute top-10 left-[40%];
 }
 
 .third-player {
@@ -99,7 +99,9 @@
 
 .hand-bottom {
     @apply absolute -top-[150px];
+
 }
+
 
 .hand-top {
     @apply absolute top-[150px];
@@ -110,7 +112,7 @@
 }
 
 .second-player .hand .card {
-    @apply translate-y-5 rotate-180;
+    @apply translate-y-5 rotate-0;
 }
 
 .third-player .hand .card {
